@@ -5,6 +5,7 @@
 __author__ = 'nagexiucai.com'
 
 import wx as UI
+import wx.dataview as UIDV
 import sqlite3 as DB
 import os
 import sys
@@ -93,6 +94,23 @@ class TextValidator(UI.PyValidator):
         if self.flag is float:
             if keycode < 256 and chr(keycode) in "."+string.digits or keycode in (314, 315, 316, 317, 8):
                 evt.Skip()
+
+class HuiYuan(UI.Panel):
+    def __init__(self, parent):
+        UI.Panel.__init__(self, parent)
+        self.sizer = UI.BoxSizer(UI.VERTICAL)
+        self.dvlc = UIDV.DataViewListCtrl(self)
+        self.dvlc.AppendTextColumn("PhoneNumber", width=160)
+        self.dvlc.AppendTextColumn("Name", width=240)
+        self.dvlc.AppendTextColumn("Balance", width=120)
+        _ = parent.database.Execute("SELECT * FROM Member;")
+        for phonenumber, name, balance in _:
+            self.dvlc.AppendItem((phonenumber, name, unicode(balance)))
+        self.sizer.Add(self.dvlc, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.SetSizerAndFit(self.sizer)
+        self.Bind(UIDV.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.OnDataViewItemContextMenu)
+    def OnDataViewItemContextMenu(self, evt):
+        pass
 
 class Record(UI.Dialog):
     IdOK = UI.NewId()
@@ -366,6 +384,7 @@ class Frame(UI.Frame):
     def OnMenu(self, evt):
         _ = evt.GetId()
         self.sb.SetStatusText(self.mb.FindItemById(_).GetText())
+        self.sizer.Clear(True)
         if _ == Frame.IdDengRu:
             InOut(self).ShowModal()
         elif _ == Frame.IdZuoZhe:
@@ -373,13 +392,13 @@ class Frame(UI.Frame):
         elif _ == Frame.IdJiHuo:
             UI.TextEntryDialog(self, u"激活码（微信添加nagexiucai好友申请）", u"激活").ShowModal()
         elif _ == Frame.IdDanXiang and self.status != Frame.IdDanXiang:
-            self.sizer.Clear(True)
             self.sizer.Add(DanXiang(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
-            self.Fit()
         elif _ == Frame.IdTaoCan and self.status != Frame.IdTaoCan:
-            self.sizer.Clear(True)
             self.sizer.Add(TaoCan(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
-            self.Fit()
+        elif _ == Frame.IdHuiYuan and self.status != Frame.IdHuiYuan:
+            self.sizer.Add(HuiYuan(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.Fit()
+        self.PostSizeEvent()
         self.status = _
     def OnTimer(self, evt):
         _ = evt.GetId()
