@@ -5,9 +5,11 @@
 __author__ = 'nagexiucai.com'
 
 import wx as UI
+import wx.dataview as UIDV
 import sqlite3 as DB
 import os
 import sys
+import string
 
 FIXED = 0
 DEFAULT = AUTO = -1
@@ -23,14 +25,29 @@ class Database:
     def Initialize(self):
         CREATE = (
             "CREATE TABLE Member (PhoneNumber TEXT, Name TEXT, Balance FLOAT);",
-            "CREATE TABLE DanXiang (Number TEXT, Name TEXT, Price FLOAT);"
+            "CREATE TABLE DanXiang (Number TEXT, Name TEXT, Price FLOAT);",
+            "CREATE TABLE TaoCan (Combination TEXT, Name TEXT, Price FLOAT);"
         )
         INSERT = (
-            "INSERT INTO Member VALUES ('086182029*****', '那个秀才', 33.33);",
-            "INSERT INTO Member VALUES ('086182918*****', '大海', 77.77);",
-            "INSERT INTO DanXiang VALUES ('X', '吹一', 30.00);",
-            "INSERT INTO DanXiang VALUES ('Y', '染一', 90.00);",
-            "INSERT INTO DanXiang VALUES ('Z', '洗二', 88.00);"
+            u"INSERT INTO Member VALUES ('086182029*****', '那个秀才', 33.33);",
+            u"INSERT INTO Member VALUES ('086182918*****', '大海', 77.77);",
+            u"INSERT INTO DanXiang VALUES ('X', '吹一', 30.00);",
+            u"INSERT INTO DanXiang VALUES ('Y', '染一', 90.00);",
+            u"INSERT INTO DanXiang VALUES ('Z', '洗二', 88.00);",
+            u"INSERT INTO DanXiang VALUES ('A', '洗一', 10.00);",
+            u"INSERT INTO DanXiang VALUES ('B', '染二', 11.00);",
+            u"INSERT INTO DanXiang VALUES ('C', '染三', 12.00);",
+            u"INSERT INTO DanXiang VALUES ('D', '吹二', 13.00);",
+            u"INSERT INTO DanXiang VALUES ('E', '烫一', 14.00);",
+            u"INSERT INTO DanXiang VALUES ('F', '烫二', 15.00);",
+            u"INSERT INTO DanXiang VALUES ('G', '烫三', 16.00);",
+            u"INSERT INTO DanXiang VALUES ('H', '拉一', 17.00);",
+            u"INSERT INTO DanXiang VALUES ('I', '拉二', 18.00);",
+            u"INSERT INTO DanXiang VALUES ('J', '剪一', 19.00);",
+            u"INSERT INTO DanXiang VALUES ('K', '剪二', 20.00);",
+            u"INSERT INTO TaoCan VALUES ('X+Y', '吹一加染一', 55.55);",
+            u"INSERT INTO TaoCan VALUES ('Y+Z+D', '染一加洗二加吹二', 99.99);",
+            u"INSERT INTO TaoCan VALUES ('G+H+J', '烫三加垃一加剪一', 29.90);"
         )
         for _ in CREATE:
             self.Execute(_)
@@ -38,6 +55,8 @@ class Database:
             self.Execute(_)
     def Clear(self):pass
     def Execute(self, sql): # TODO: make many
+        print "[SQL]", sql
+        assert isinstance(sql, basestring)
         cursor = Database.CONNECT.cursor()
         cursor.execute(sql)
         if sql.upper().startswith("SELECT "):
@@ -45,6 +64,7 @@ class Database:
         else:
             Database.CONNECT.commit()
         cursor.close()
+        return []
     @classmethod
     def Test(cls):
         self = cls()
@@ -54,22 +74,221 @@ class Database:
         self.Execute("INSERT INTO DanXiang VALUES ('H', 'What', 22.22)")
         print self.Execute("SELECT * FROM DanXiang")
 
-class DanXiang(UI.Panel):
+# class TextValidator(UI.PyValidator): # FIXME: WX3.0
+class TextValidator(UI.Validator):
+    def __init__(self, flag):
+        # UI.PyValidator.__init__(self)
+        UI.Validator.__init__(self)
+        self.flag = flag
+        self.Bind(UI.EVT_CHAR, self.OnChar)
+    def Clone(self):
+        return TextValidator(self.flag)
+    def Validate(self, w):
+        return True
+    def TransferToWindow(self):
+        return True
+    def TransferFromWindow(self):
+
+        return True
+    def OnChar(self, evt):
+        keycode = evt.GetKeyCode()
+        print keycode
+        if self.flag is float:
+            if keycode < 256 and chr(keycode) in "."+string.digits or keycode in (314, 315, 316, 317, 8):
+                evt.Skip()
+
+class JieZhang(UI.Panel):
+    RowNumber = 3
+    ColumnNumber = 3
+    HorizontalGap = 5
+    VerticalGap = 5
     def __init__(self, parent):
         UI.Panel.__init__(self, parent)
-        self.sizer = UI.GridBagSizer(5, 5)
-        i = c = r = 0
-        _ = parent.database.Execute("SELECT * FROM DanXiang")
+        # self.sizer = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber) # FIXME: WX3.0 has a __init__(int, int) overload
+        self.sizer = UI.GridSizer(JieZhang.ColumnNumber, gap=(JieZhang.HorizontalGap, JieZhang.VerticalGap))
+
+class HuiYuan(UI.Panel):
+    def __init__(self, parent):
+        UI.Panel.__init__(self, parent)
+        self.sizer = UI.BoxSizer(UI.VERTICAL)
+        self.dvlc = UIDV.DataViewListCtrl(self)
+        self.dvlc.AppendTextColumn("PhoneNumber", width=160)
+        self.dvlc.AppendTextColumn("Name", width=240)
+        self.dvlc.AppendTextColumn("Balance", width=120)
+        _ = parent.database.Execute("SELECT * FROM Member;")
+        for phonenumber, name, balance in _:
+            self.dvlc.AppendItem((phonenumber, name, unicode(balance)))
+        self.sizer.Add(self.dvlc, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.SetSizerAndFit(self.sizer)
+        self.Bind(UIDV.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.OnDataViewItemContextMenu)
+    def OnDataViewItemContextMenu(self, evt):
+        pass
+
+class Record(UI.Dialog):
+    IdOK = UI.NewId()
+    IdCancel = UI.NewId()
+    IdRemove = UI.NewId()
+    def __init__(self, parent, title, data):
+        UI.Dialog.__init__(self, parent, title=title)
+        self.sizer = UI.BoxSizer(UI.VERTICAL)
+        assert isinstance(data, dict)
+        for k, v in data.iteritems():
+            st = UI.StaticText(self, label=k, size=(80, 20))
+            if isinstance(v, float): # for price etc
+                tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(float)) # TODO: 主键禁止修改
+                tc.Validate()
+            else:
+                tc = UI.TextCtrl(self, value=v, name=k, size=(120, 20))
+            sizer = UI.BoxSizer(UI.HORIZONTAL)
+            sizer.Add(st, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+            sizer.Add(tc, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+            self.sizer.Add(sizer, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        ok = UI.Button(self, id=Record.IdOK, label=u"确认")
+        self.sizer.Add(ok, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        cancel = UI.Button(self, id=Record.IdCancel, label=u"放弃")
+        self.sizer.Add(cancel, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        remove = UI.Button(self, id=Record.IdRemove, label=u"删除")
+        self.sizer.Add(remove, proportion=FIXED, flag=UI.EXPAND | UI.ALL)
+        self.SetSizerAndFit(self.sizer)
+        self.Bind(UI.EVT_BUTTON, self.OnButton)
+        self.Bind(UI.EVT_TEXT, self.OnText)
+        self.UserData = data
+        self.DirtyUserData = {}
+        cancel.SetFocus()
+        self.status = None
+    def OnButton(self, evt):
+        _ = evt.GetId()
+        self.status = _
+        if _ == Record.IdOK:
+            self.UserData.update(self.DirtyUserData)
+        self.Destroy()
+    def OnText(self, evt):
+        _ = self.FindWindowById(evt.GetId())
+        self.DirtyUserData[_.GetName()] = _.GetValue() # FIXME: need format price to float
+
+class TaoCan(UI.Panel):
+    IdGenerate = UI.NewId()
+    def __init__(self, parent):
+        UI.Panel.__init__(self, parent)
+        self.sizer = UI.BoxSizer(UI.HORIZONTAL)
+        self.sizerLeft = UI.BoxSizer(UI.VERTICAL)
+        self.sizerRight = UI.BoxSizer(UI.VERTICAL)
+        b = UI.Button(self, id=TaoCan.IdGenerate, label=u"生成")
+        _ = parent.database.Execute("SELECT * FROM DanXiang;")
+        __ = []
+        self.UserDataDX = {}
         for number, name, price in _:
-            c = i%2
-            r = i/2
+            __.append(name)
+            self.UserDataDX[name] = {"Number": number, "Price": price}
+        clb = UI.CheckListBox(self, choices=__)
+        self.sizerLeft.Add(clb, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.sizerLeft.Add(b, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        _ = parent.database.Execute("SELECT * FROM TaoCan;")
+        self.UserDataTC = {}
+        font = UI.Font(26, UI.DEFAULT, UI.NORMAL, UI.NORMAL)
+        for combination, name, price in _:
+            data = {"Combination": combination, "Name": name, "Price": price}
+            b = UI.Button(self, label=name)
+            # b.SetToolTipString(unicode(price)) # FIXME: WX3.0
+            b.SetToolTip(unicode(price))
+            b.SetFont(font)
+            setattr(b, "UserData", data)
+            self.UserDataTC[combination] = data
+            self.sizerRight.Add(b, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.sizerLeft.SetMinSize((160, 80))
+        self.sizerRight.SetMinSize((200, 80))
+        self.sizer.Add(self.sizerLeft, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        self.sizer.Add(self.sizerRight, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.SetSizerAndFit(self.sizer)
+        self.Bind(UI.EVT_BUTTON, self.OnButton)
+    def OnButton(self, evt):
+        _ = evt.GetId()
+        if _ == TaoCan.IdGenerate:
+            print u"新增"
+        else:
+            __ = self.FindWindowById(_)
+            data = __.UserData
+            dlg = Record(self, data.get("Name", u"缺失异常"), data)
+            dlg.ShowModal()
+            if dlg.status == Record.IdRemove:
+                print u"删除"
+            elif dlg.status == Record.IdOK:
+                print u"修改"
+
+class DanXiang(UI.Panel):
+    ColumnNumber = 11
+    IdPlus = UI.NewId()
+    def __init__(self, parent):
+        UI.Panel.__init__(self, parent)
+        self.sizer = UI.GridBagSizer(5, 5) # TODO: 找一种行列不固定且会根据元素总数及尺寸自适应的布局框架
+        i = c = r = 0
+        _ = parent.database.Execute("SELECT * FROM DanXiang;")
+        column = []
+        row = []
+        font = UI.Font(22, UI.DEFAULT, UI.NORMAL, UI.NORMAL)
+        for number, name, price in _:
+            c = i%DanXiang.ColumnNumber
+            column.append(c)
+            r = i/DanXiang.ColumnNumber
+            row.append(r)
             i += 1
             b = UI.Button(self, label=name)
-            self.sizer.Add(b, pos=(r,c), flag=UI.EXPAND|UI.ALL)
-        b = UI.Button(self, label="+")
-        self.sizer.Add(b, pos=divmod(i, 2), flag=UI.EXPAND|UI.ALL)
-        self.sizer.SetMinSize(parent.GetClientSize())
+            # b.SetToolTipString(unicode(price)) # FIXME: WX3.0
+            b.SetToolTip(unicode(price))
+            setattr(b, "UserData", {"Number": number, "Name": name, "Price": price})
+            b.SetFont(font)
+            self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
+        font = UI.Font(24, UI.DEFAULT, UI.NORMAL, UI.NORMAL)
+        b = UI.Button(self, id=DanXiang.IdPlus, label="+")
+        b.SetFont(font)
+        r, c = divmod(i, DanXiang.ColumnNumber)
+        row.append(r)
+        column.append(c)
+        self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
+        for r in set(row):
+            self.sizer.AddGrowableRow(r, AUTO)
+        for c in set(column):
+            self.sizer.AddGrowableCol(c, AUTO)
         self.SetSizerAndFit(self.sizer)
+        self.Bind(UI.EVT_BUTTON, self.OnButton)
+    def OnButton(self, evt):
+        _ = evt.GetId()
+        __ = self.FindWindowById(_)
+        if _ == DanXiang.IdPlus:
+            here = self.sizer.GetItemCount()
+            data = {"Number": "?", "Name": "?", "Price": 0.0}
+            dlg = Record(self, u"添加", data)
+            dlg.ShowModal()
+            # TODO: 去重（也可以放在Validator中做）
+            if dlg.status == Record.IdOK:
+                b = UI.Button(self, label=data.get("Name", u"缺失异常"))
+                b.SetFont(__.GetFont())
+                setattr(b, "UserData", data)
+                r, c = self.sizer.GetItemPosition(__)
+                self.sizer.Detach(__) # FIXME: Insert can not used by GridBagSizer
+                self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
+                r, c = divmod(here, DanXiang.ColumnNumber)
+                self.sizer.Add(__, pos=(r, c), flag=UI.EXPAND|UI.ALL)
+                if not self.sizer.IsRowGrowable(r):
+                    self.sizer.AddGrowableRow(r, AUTO)
+                if not self.sizer.IsColGrowable(c):
+                    self.sizer.AddGrowableCol(c, AUTO)
+                self.sizer.Layout()
+                self.Parent.database.Execute(u"INSERT INTO DanXiang VALUES ('{Number}', '{Name}', {Price});".format(**data))
+        else:
+            data = __.UserData
+            dlg = Record(self, data.get("Name", u"缺失异常"), data)
+            dlg.ShowModal()
+            if dlg.status == Record.IdOK:
+                __.SetLabel(data.get("Name", u"缺失异常"))
+                # FIXME: 按钮标注文字加长窗口不能自适应（需手动触发）
+                self.PostSizeEventToParent()
+                self.Parent.database.Execute(u"UPDATE DanXiang SET Name='{Name}', Price={Price} WHERE Number='{Number}';".format(**data))
+            elif dlg.status == Record.IdRemove:
+                # self.sizer.Remove(__) # FIXME: why does not work
+                __.Destroy()
+                self.sizer.Layout()
+                self.Parent.database.Execute(u"DELETE FROM DanXiang WHERE Number='{Number}';".format(**data))
 
 class InOut(UI.Dialog):
     IdAccount = UI.NewId()
@@ -116,11 +335,14 @@ class Frame(UI.Frame):
         self.database = Database()
         self.database.Initialize()
         self.SetMinSize((640, 480))
+        # self.icon = UI.Icon("./app.ico") # FIXME: WX3.0 need a name parameter
         self.icon = UI.Icon()
         self.icon.LoadFile("./app.ico")
         self.SetIcon(self.icon)
+        self.status = None
         self.sb = UI.StatusBar(self)
         self.sb.SetFieldsCount()
+        # self.sb.SetStatusWidths([AUTO]) # FIXME: WX3.0 need list parameter
         self.sb.SetStatusWidths((AUTO,))
         self.sb.SetStatusText(u"未激活")
         self.SetStatusBar(self.sb)
@@ -129,6 +351,7 @@ class Frame(UI.Frame):
         self.inout = UI.Menu()
         self.mb.Append(self.inout, u"管理")
         self.dengru = UI.MenuItem(self.inout, id=Frame.IdDengRu, text=u"登入")
+        # self.inout.AppendItem(self.dengru) # FIXME: WX3.0 need AppendItem
         self.inout.Append(self.dengru)
         self.tuichu = UI.MenuItem(self.inout, id=Frame.IdTuiChu, text=u"退出")
         self.inout.Append(self.tuichu)
@@ -143,6 +366,7 @@ class Frame(UI.Frame):
         self.xitong.Append(self.daochu)
         self.shengji = UI.MenuItem(self.setting, id=Frame.IdShengJi, text=u"升级")
         self.xitong.Append(self.shengji)
+        # self.setting.AppendMenu(UI.NewId(), u"系统", self.xitong) # FIXME: WX3.0 need AppendMenu
         self.setting.Append(UI.NewId(), u"系统", self.xitong)
         self.fuwu = UI.Menu()
         self.danxiang = UI.MenuItem(self.setting, id=Frame.IdDanXiang, text=u"单项")
@@ -166,20 +390,33 @@ class Frame(UI.Frame):
         self.about.Append(self.zuozhe)
         self.Bind(UI.EVT_MENU, self.OnMenu)
         self.timerA = UI.Timer(owner=self, id=Frame.IdZhangHuTimer)
-        self.timerA.StartOnce(600)
+        self.timerA.Start(600, True) # FIXME: WX3.0 has no StartOnce
+        # self.timerA.StartOnce(600)
         self.Bind(UI.EVT_TIMER, self.OnTimer)
         self.sizer = UI.BoxSizer(UI.VERTICAL)
+        self.sizer.SetMinSize((620, 400))
+        self.SetSizer(self.sizer)
     def OnMenu(self, evt):
         _ = evt.GetId()
+        self.sb.SetStatusText(self.mb.FindItemById(_).GetText())
+        self.sizer.Clear(True)
         if _ == Frame.IdDengRu:
             InOut(self).ShowModal()
         elif _ == Frame.IdZuoZhe:
             UI.MessageBox(u"那个秀才［www.nagexiucai.com］", u"作者")
         elif _ == Frame.IdJiHuo:
             UI.TextEntryDialog(self, u"激活码（微信添加nagexiucai好友申请）", u"激活").ShowModal()
-        elif _ == Frame.IdDanXiang:
+        elif _ == Frame.IdDanXiang and self.status != Frame.IdDanXiang:
             self.sizer.Add(DanXiang(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
-            self.SetSizer(self.sizer)
+        elif _ == Frame.IdTaoCan and self.status != Frame.IdTaoCan:
+            self.sizer.Add(TaoCan(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        elif _ == Frame.IdHuiYuan and self.status != Frame.IdHuiYuan:
+            self.sizer.Add(HuiYuan(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        elif _ == Frame.IdJieZhang and self.status != Frame.IdJieZhang:
+            self.sizer.Add(JieZhang(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.Fit()
+        self.PostSizeEvent()
+        self.status = _
     def OnTimer(self, evt):
         _ = evt.GetId()
         if _ == Frame.IdZhangHuTimer:
