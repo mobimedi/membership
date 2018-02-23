@@ -310,19 +310,21 @@ class Frame(UI.Frame):
         self.sizer = UI.BoxSizer(UI.VERTICAL)
     def OnMenu(self, evt):
         _ = evt.GetId()
+        self.sb.SetStatusText(self.mb.FindItemById(_).GetText())
         if _ == Frame.IdDengRu:
             InOut(self).ShowModal()
         elif _ == Frame.IdZuoZhe:
             UI.MessageBox(u"那个秀才［www.nagexiucai.com］", u"作者")
         elif _ == Frame.IdJiHuo:
             UI.TextEntryDialog(self, u"激活码（微信添加nagexiucai好友申请）", u"激活").ShowModal()
-        elif _ == Frame.IdDanXiang and self.status != u"单项":
+        elif _ == Frame.IdDanXiang and self.status != Frame.IdDanXiang:
+            self.sizer.Clear(True)
             self.sizer.Add(DanXiang(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
             self.sizer.SetMinSize((640, 480))
             self.SetSizerAndFit(self.sizer)
-        elif _ == Frame.IdTaoCan:
-            pass
-        self.status = self.mb.FindItemById(_).GetText()
+        elif _ == Frame.IdTaoCan and self.status != Frame.IdTaoCan:
+            self.sizer.Clear(True)
+        self.status = _
     def OnTimer(self, evt):
         _ = evt.GetId()
         if _ == Frame.IdZhangHuTimer:
