@@ -24,7 +24,8 @@ class Database:
     def Initialize(self):
         CREATE = (
             "CREATE TABLE Member (PhoneNumber TEXT, Name TEXT, Balance FLOAT);",
-            "CREATE TABLE DanXiang (Number TEXT, Name TEXT, Price FLOAT);"
+            "CREATE TABLE DanXiang (Number TEXT, Name TEXT, Price FLOAT);",
+            "CREATE TABLE TaoCan (Combination TEXT, Name TEXT, Price FLOAT);"
         )
         INSERT = (
             "INSERT INTO Member VALUES ('086182029*****', '那个秀才', 33.33);",
@@ -42,7 +43,10 @@ class Database:
             "INSERT INTO DanXiang VALUES ('H', '拉一', 17.00);",
             "INSERT INTO DanXiang VALUES ('I', '拉二', 18.00);",
             "INSERT INTO DanXiang VALUES ('J', '剪一', 19.00);",
-            "INSERT INTO DanXiang VALUES ('K', '剪二', 20.00);"
+            "INSERT INTO DanXiang VALUES ('K', '剪二', 20.00);",
+            "INSERT INTO TaoCan VALUES ('X+Y', '吹一加染一', 55.55);",
+            "INSERT INTO TaoCan VALUES ('Y+Z+D', '染一加洗二加吹二', 99.99);",
+            "INSERT INTO TaoCan VALUES ('G+H+J', '烫三加垃一加剪一', 29.90);"
         )
         for _ in CREATE:
             self.Execute(_)
@@ -99,7 +103,7 @@ class Record(UI.Dialog):
         self.sizer = UI.BoxSizer(UI.VERTICAL)
         assert isinstance(data, dict)
         for k, v in data.iteritems():
-            st = UI.StaticText(self, label=k, size=(60, 20))
+            st = UI.StaticText(self, label=k, size=(80, 20))
             if isinstance(v, float): # for price etc
                 tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(float)) # TODO: 主键禁止修改
                 tc.Validate()
@@ -132,6 +136,54 @@ class Record(UI.Dialog):
         _ = self.FindWindowById(evt.GetId())
         self.DirtyUserData[_.GetName()] = _.GetValue() # FIXME: need format price to float
 
+class TaoCan(UI.Panel):
+    IdGenerate = UI.NewId()
+    def __init__(self, parent):
+        UI.Panel.__init__(self, parent)
+        self.sizer = UI.BoxSizer(UI.HORIZONTAL)
+        self.sizerLeft = UI.BoxSizer(UI.VERTICAL)
+        self.sizerRight = UI.BoxSizer(UI.VERTICAL)
+        b = UI.Button(self, id=TaoCan.IdGenerate, label=u"生成")
+        _ = parent.database.Execute("SELECT * FROM DanXiang;")
+        __ = []
+        self.UserDataDX = {}
+        for number, name, price in _:
+            __.append(name)
+            self.UserDataDX[name] = {"Number": number, "Price": price}
+        clb = UI.CheckListBox(self, choices=__)
+        self.sizerLeft.Add(clb, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.sizerLeft.Add(b, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        _ = parent.database.Execute("SELECT * FROM TaoCan;")
+        self.UserDataTC = {}
+        font = UI.Font(26, UI.DEFAULT, UI.NORMAL, UI.NORMAL)
+        for combination, name, price in _:
+            data = {"Combination": combination, "Name": name, "Price": price}
+            b = UI.Button(self, label=name)
+            b.SetToolTipString(unicode(price))
+            b.SetFont(font)
+            setattr(b, "UserData", data)
+            self.UserDataTC[combination] = data
+            self.sizerRight.Add(b, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.sizerLeft.SetMinSize((160, 80))
+        self.sizerRight.SetMinSize((200, 80))
+        self.sizer.Add(self.sizerLeft, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        self.sizer.Add(self.sizerRight, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.SetSizerAndFit(self.sizer)
+        self.Bind(UI.EVT_BUTTON, self.OnButton)
+    def OnButton(self, evt):
+        _ = evt.GetId()
+        if _ == TaoCan.IdGenerate:
+            print u"新增"
+        else:
+            __ = self.FindWindowById(_)
+            data = __.UserData
+            dlg = Record(self, data.get("Name", u"缺失异常"), data)
+            dlg.ShowModal()
+            if dlg.status == Record.IdRemove:
+                print u"删除"
+            elif dlg.status == Record.IdOK:
+                print u"修改"
+
 class DanXiang(UI.Panel):
     ColumnNumber = 11
     IdPlus = UI.NewId()
@@ -139,7 +191,7 @@ class DanXiang(UI.Panel):
         UI.Panel.__init__(self, parent)
         self.sizer = UI.GridBagSizer(5, 5) # TODO: 找一种行列不固定且会根据元素总数及尺寸自适应的布局框架
         i = c = r = 0
-        _ = parent.database.Execute("SELECT * FROM DanXiang")
+        _ = parent.database.Execute("SELECT * FROM DanXiang;")
         column = []
         row = []
         font = UI.Font(22, UI.DEFAULT, UI.NORMAL, UI.NORMAL)
@@ -150,12 +202,13 @@ class DanXiang(UI.Panel):
             row.append(r)
             i += 1
             b = UI.Button(self, label=name)
+            b.SetToolTipString(unicode(price))
             setattr(b, "UserData", {"Number": number, "Name": name, "Price": price})
-            b.SetOwnFont(font)
+            b.SetFont(font)
             self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
         font = UI.Font(24, UI.DEFAULT, UI.NORMAL, UI.NORMAL)
         b = UI.Button(self, id=DanXiang.IdPlus, label="+")
-        b.SetOwnFont(font)
+        b.SetFont(font)
         r, c = divmod(i, DanXiang.ColumnNumber)
         row.append(r)
         column.append(c)
@@ -308,6 +361,8 @@ class Frame(UI.Frame):
         # self.timerA.StartOnce(600)
         self.Bind(UI.EVT_TIMER, self.OnTimer)
         self.sizer = UI.BoxSizer(UI.VERTICAL)
+        self.sizer.SetMinSize((620, 400))
+        self.SetSizer(self.sizer)
     def OnMenu(self, evt):
         _ = evt.GetId()
         self.sb.SetStatusText(self.mb.FindItemById(_).GetText())
@@ -320,10 +375,11 @@ class Frame(UI.Frame):
         elif _ == Frame.IdDanXiang and self.status != Frame.IdDanXiang:
             self.sizer.Clear(True)
             self.sizer.Add(DanXiang(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
-            self.sizer.SetMinSize((640, 480))
-            self.SetSizerAndFit(self.sizer)
+            self.Fit()
         elif _ == Frame.IdTaoCan and self.status != Frame.IdTaoCan:
             self.sizer.Clear(True)
+            self.sizer.Add(TaoCan(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+            self.Fit()
         self.status = _
     def OnTimer(self, evt):
         _ = evt.GetId()
