@@ -102,10 +102,46 @@ class JieZhang(UI.Panel):
     ColumnNumber = 3
     HorizontalGap = 5
     VerticalGap = 5
+    IdSearch = UI.NewId()
+    IdTotal = UI.NewId()
+    IdPay = UI.NewId()
     def __init__(self, parent):
         UI.Panel.__init__(self, parent)
-        # self.sizer = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber) # FIXME: WX3.0 has a __init__(int, int) overload
-        self.sizer = UI.GridSizer(JieZhang.ColumnNumber, gap=(JieZhang.HorizontalGap, JieZhang.VerticalGap))
+        self.sizer = UI.BoxSizer(UI.VERTICAL)
+        staticBoxDX = UI.StaticBox(self, label=u"单项")
+        staticBoxSizerDX = UI.StaticBoxSizer(staticBoxDX, UI.VERTICAL)
+        _dx = parent.database.Execute("SELECT * FROM DanXiang;")
+        # sizer = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber) # FIXME: WX3.0 has a __init__(int, int) overload
+        sizerDX = UI.GridSizer(JieZhang.ColumnNumber, gap=(JieZhang.HorizontalGap, JieZhang.VerticalGap))
+        for number, name, price in _dx:
+            cb = UI.CheckBox(self, label=name)
+            sizerDX.Add(cb, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        staticBoxSizerDX.Add(sizerDX, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        _tc = parent.database.Execute("SELECT * FROM TaoCan;")
+        item = []
+        for combination, name, price in _tc:
+            item.append(name)
+        radioBoxTC = UI.RadioBox(self, label=u"套餐", choices=item, majorDimension=JieZhang.ColumnNumber)
+        self.sizer.Add(staticBoxSizerDX, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        self.sizer.Add(radioBoxTC, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerH = UI.BoxSizer(UI.HORIZONTAL)
+        sizerV = UI.BoxSizer(UI.VERTICAL)
+        self.search = UI.SearchCtrl(self, id=JieZhang.IdSearch, style=UI.TE_PROCESS_ENTER)
+        self.total = UI.StaticText(self, id=JieZhang.IdTotal, label="0.00", style=UI.BORDER|UI.ALIGN_CENTER)
+        self.pay = UI.Button(self, id=JieZhang.IdPay, label=u"支付")
+        sizerV.Add(self.search, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerV.Add(self.total, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerV.Add(self.pay, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerH.Add(AUTO, AUTO, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        sizerH.Add(sizerV, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        sizerH.Add(AUTO, AUTO, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.sizer.Add(sizerH, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.SetSizerAndFit(self.sizer)
+        self.Bind(UI.EVT_SEARCHCTRL_SEARCH_BTN, self.OnSearch)
+        self.Bind(UI.EVT_SEARCHCTRL_CANCEL_BTN, self.OnSearch)
+        self.Bind(UI.EVT_TEXT_ENTER, self.OnSearch)
+    def OnSearch(self, evt):
+        print u"搜索"
 
 class HuiYuan(UI.Panel):
     def __init__(self, parent):
