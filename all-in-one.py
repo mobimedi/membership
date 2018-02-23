@@ -50,6 +50,7 @@ class Database:
             self.Execute(_)
     def Clear(self):pass
     def Execute(self, sql): # TODO: make many
+        print "[SQL]", sql
         assert isinstance(sql, basestring)
         cursor = Database.CONNECT.cursor()
         cursor.execute(sql)
@@ -84,13 +85,15 @@ class TextValidator(UI.PyValidator):
         return True
     def OnChar(self, evt):
         keycode = evt.GetKeyCode()
+        print keycode
         if self.flag is float:
-            if keycode < 256 and chr(keycode) in "."+string.digits:
+            if keycode < 256 and chr(keycode) in "."+string.digits or keycode in (314, 315, 316, 317, 8):
                 evt.Skip()
 
 class Record(UI.Dialog):
     IdOK = UI.NewId()
     IdCancel = UI.NewId()
+    IdRemove = UI.NewId()
     def __init__(self, parent, title, data):
         UI.Dialog.__init__(self, parent, title=title)
         self.sizer = UI.BoxSizer(UI.VERTICAL)
@@ -98,7 +101,7 @@ class Record(UI.Dialog):
         for k, v in data.iteritems():
             st = UI.StaticText(self, label=k, size=(60, 20))
             if isinstance(v, float): # for price etc
-                tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(float))
+                tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(float)) # TODO: 主键禁止修改
                 tc.Validate()
             else:
                 tc = UI.TextCtrl(self, value=v, name=k, size=(120, 20))
@@ -110,13 +113,18 @@ class Record(UI.Dialog):
         self.sizer.Add(ok, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
         cancel = UI.Button(self, id=Record.IdCancel, label=u"放弃")
         self.sizer.Add(cancel, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        remove = UI.Button(self, id=Record.IdRemove, label=u"删除")
+        self.sizer.Add(remove, proportion=FIXED, flag=UI.EXPAND | UI.ALL)
         self.SetSizerAndFit(self.sizer)
         self.Bind(UI.EVT_BUTTON, self.OnButton)
         self.Bind(UI.EVT_TEXT, self.OnText)
         self.UserData = data
         self.DirtyUserData = {}
+        cancel.SetFocus()
+        self.status = None
     def OnButton(self, evt):
         _ = evt.GetId()
+        self.status = _
         if _ == Record.IdOK:
             self.UserData.update(self.DirtyUserData)
         self.Destroy()
@@ -127,10 +135,9 @@ class Record(UI.Dialog):
 class DanXiang(UI.Panel):
     ColumnNumber = 11
     IdPlus = UI.NewId()
-    IdMinus = UI.NewId()
     def __init__(self, parent):
         UI.Panel.__init__(self, parent)
-        self.sizer = UI.GridBagSizer(5, 5)
+        self.sizer = UI.GridBagSizer(5, 5) # TODO: 找一种行列不固定且会根据元素总数及尺寸自适应的布局框架
         i = c = r = 0
         _ = parent.database.Execute("SELECT * FROM DanXiang")
         column = []
@@ -153,12 +160,6 @@ class DanXiang(UI.Panel):
         row.append(r)
         column.append(c)
         self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
-        b = UI.Button(self, id=DanXiang.IdMinus, label="-")
-        b.SetOwnFont(font)
-        r, c = divmod(i+1, DanXiang.ColumnNumber)
-        row.append(r)
-        column.append(c)
-        self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
         for r in set(row):
             self.sizer.AddGrowableRow(r, AUTO)
         for c in set(column):
@@ -167,14 +168,42 @@ class DanXiang(UI.Panel):
         self.Bind(UI.EVT_BUTTON, self.OnButton)
     def OnButton(self, evt):
         _ = evt.GetId()
+        __ = self.FindWindowById(_)
         if _ == DanXiang.IdPlus:
-            pass
-        elif _ == DanXiang.IdMinus:
-            pass
+            here = self.sizer.GetItemCount()
+            data = {"Number": "?", "Name": "?", "Price": 0.0}
+            dlg = Record(self, u"添加", data)
+            dlg.ShowModal()
+            # TODO: 去重（也可以放在Validator中做）
+            if dlg.status == Record.IdOK:
+                b = UI.Button(self, label=data.get("Name", u"缺失异常"))
+                b.SetFont(__.GetFont())
+                setattr(b, "UserData", data)
+                r, c = self.sizer.GetItemPosition(__)
+                self.sizer.Detach(__) # FIXME: Insert can not used by GridBagSizer
+                self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
+                r, c = divmod(here, DanXiang.ColumnNumber)
+                self.sizer.Add(__, pos=(r, c), flag=UI.EXPAND|UI.ALL)
+                if not self.sizer.IsRowGrowable(r):
+                    self.sizer.AddGrowableRow(r, AUTO)
+                if not self.sizer.IsColGrowable(c):
+                    self.sizer.AddGrowableCol(c, AUTO)
+                self.sizer.Layout()
+                self.Parent.database.Execute(u"INSERT INTO DanXiang VALUES ('{Number}', '{Name}', {Price});".format(**data))
         else:
-            data = self.FindWindowById(_).UserData
-            Record(self, data.get("Name", u"缺失异常"), data).ShowModal()
-            print data
+            data = __.UserData
+            dlg = Record(self, data.get("Name", u"缺失异常"), data)
+            dlg.ShowModal()
+            if dlg.status == Record.IdOK:
+                __.SetLabel(data.get("Name", u"缺失异常"))
+                # FIXME: 按钮标注文字加长窗口不能自适应（需手动触发）
+                self.PostSizeEventToParent()
+                self.Parent.database.Execute(u"UPDATE DanXiang SET Name='{Name}', Price={Price} WHERE Number='{Number}';".format(**data))
+            elif dlg.status == Record.IdRemove:
+                # self.sizer.Remove(__) # FIXME: why does not work
+                __.Destroy()
+                self.sizer.Layout()
+                self.Parent.database.Execute(u"DELETE FROM DanXiang WHERE Number='{Number}';".format(**data))
 
 class InOut(UI.Dialog):
     IdAccount = UI.NewId()
@@ -224,6 +253,7 @@ class Frame(UI.Frame):
         self.icon = UI.Icon("./app.ico") # FIXME: WX3.0 need a name parameter
         # self.icon.LoadFile("./app.ico")
         self.SetIcon(self.icon)
+        self.status = None
         self.sb = UI.StatusBar(self)
         self.sb.SetFieldsCount()
         self.sb.SetStatusWidths([AUTO]) # FIXME: WX3.0 need list parameter
@@ -286,10 +316,13 @@ class Frame(UI.Frame):
             UI.MessageBox(u"那个秀才［www.nagexiucai.com］", u"作者")
         elif _ == Frame.IdJiHuo:
             UI.TextEntryDialog(self, u"激活码（微信添加nagexiucai好友申请）", u"激活").ShowModal()
-        elif _ == Frame.IdDanXiang:
+        elif _ == Frame.IdDanXiang and self.status != u"单项":
             self.sizer.Add(DanXiang(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
-            self.sizer.SetMinSize(self.GetClientSize())
+            self.sizer.SetMinSize((640, 480))
             self.SetSizerAndFit(self.sizer)
+        elif _ == Frame.IdTaoCan:
+            pass
+        self.status = self.mb.FindItemById(_).GetText()
     def OnTimer(self, evt):
         _ = evt.GetId()
         if _ == Frame.IdZhangHuTimer:
