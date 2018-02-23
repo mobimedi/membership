@@ -8,6 +8,7 @@ import wx as UI
 import sqlite3 as DB
 import os
 import sys
+import string
 
 FIXED = 0
 DEFAULT = AUTO = -1
@@ -30,7 +31,18 @@ class Database:
             "INSERT INTO Member VALUES ('086182918*****', '大海', 77.77);",
             "INSERT INTO DanXiang VALUES ('X', '吹一', 30.00);",
             "INSERT INTO DanXiang VALUES ('Y', '染一', 90.00);",
-            "INSERT INTO DanXiang VALUES ('Z', '洗二', 88.00);"
+            "INSERT INTO DanXiang VALUES ('Z', '洗二', 88.00);",
+            "INSERT INTO DanXiang VALUES ('A', '洗一', 10.00);",
+            "INSERT INTO DanXiang VALUES ('B', '染二', 11.00);",
+            "INSERT INTO DanXiang VALUES ('C', '染三', 12.00);",
+            "INSERT INTO DanXiang VALUES ('D', '吹二', 13.00);",
+            "INSERT INTO DanXiang VALUES ('E', '烫一', 14.00);",
+            "INSERT INTO DanXiang VALUES ('F', '烫二', 15.00);",
+            "INSERT INTO DanXiang VALUES ('G', '烫三', 16.00);",
+            "INSERT INTO DanXiang VALUES ('H', '拉一', 17.00);",
+            "INSERT INTO DanXiang VALUES ('I', '拉二', 18.00);",
+            "INSERT INTO DanXiang VALUES ('J', '剪一', 19.00);",
+            "INSERT INTO DanXiang VALUES ('K', '剪二', 20.00);"
         )
         for _ in CREATE:
             self.Execute(_)
@@ -38,6 +50,7 @@ class Database:
             self.Execute(_)
     def Clear(self):pass
     def Execute(self, sql): # TODO: make many
+        assert isinstance(sql, basestring)
         cursor = Database.CONNECT.cursor()
         cursor.execute(sql)
         if sql.upper().startswith("SELECT "):
@@ -45,6 +58,7 @@ class Database:
         else:
             Database.CONNECT.commit()
         cursor.close()
+        return []
     @classmethod
     def Test(cls):
         self = cls()
@@ -54,22 +68,113 @@ class Database:
         self.Execute("INSERT INTO DanXiang VALUES ('H', 'What', 22.22)")
         print self.Execute("SELECT * FROM DanXiang")
 
+class TextValidator(UI.PyValidator):
+    def __init__(self, flag):
+        UI.PyValidator.__init__(self)
+        self.flag = flag
+        self.Bind(UI.EVT_CHAR, self.OnChar)
+    def Clone(self):
+        return TextValidator(self.flag)
+    def Validate(self, w):
+        return True
+    def TransferToWindow(self):
+        return True
+    def TransferFromWindow(self):
+
+        return True
+    def OnChar(self, evt):
+        keycode = evt.GetKeyCode()
+        if self.flag is float:
+            if keycode < 256 and chr(keycode) in "."+string.digits:
+                evt.Skip()
+
+class Record(UI.Dialog):
+    IdOK = UI.NewId()
+    IdCancel = UI.NewId()
+    def __init__(self, parent, title, data):
+        UI.Dialog.__init__(self, parent, title=title)
+        self.sizer = UI.BoxSizer(UI.VERTICAL)
+        assert isinstance(data, dict)
+        for k, v in data.iteritems():
+            st = UI.StaticText(self, label=k, size=(60, 20))
+            if isinstance(v, float): # for price etc
+                tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(float))
+                tc.Validate()
+            else:
+                tc = UI.TextCtrl(self, value=v, name=k, size=(120, 20))
+            sizer = UI.BoxSizer(UI.HORIZONTAL)
+            sizer.Add(st, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+            sizer.Add(tc, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+            self.sizer.Add(sizer, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        ok = UI.Button(self, id=Record.IdOK, label=u"确认")
+        self.sizer.Add(ok, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        cancel = UI.Button(self, id=Record.IdCancel, label=u"放弃")
+        self.sizer.Add(cancel, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        self.SetSizerAndFit(self.sizer)
+        self.Bind(UI.EVT_BUTTON, self.OnButton)
+        self.Bind(UI.EVT_TEXT, self.OnText)
+        self.UserData = data
+        self.DirtyUserData = {}
+    def OnButton(self, evt):
+        _ = evt.GetId()
+        if _ == Record.IdOK:
+            self.UserData.update(self.DirtyUserData)
+        self.Destroy()
+    def OnText(self, evt):
+        _ = self.FindWindowById(evt.GetId())
+        self.DirtyUserData[_.GetName()] = _.GetValue() # FIXME: need format price to float
+
 class DanXiang(UI.Panel):
+    ColumnNumber = 11
+    IdPlus = UI.NewId()
+    IdMinus = UI.NewId()
     def __init__(self, parent):
         UI.Panel.__init__(self, parent)
         self.sizer = UI.GridBagSizer(5, 5)
         i = c = r = 0
         _ = parent.database.Execute("SELECT * FROM DanXiang")
+        column = []
+        row = []
+        font = UI.Font(22, UI.DEFAULT, UI.NORMAL, UI.NORMAL)
         for number, name, price in _:
-            c = i%2
-            r = i/2
+            c = i%DanXiang.ColumnNumber
+            column.append(c)
+            r = i/DanXiang.ColumnNumber
+            row.append(r)
             i += 1
             b = UI.Button(self, label=name)
-            self.sizer.Add(b, pos=(r,c), flag=UI.EXPAND|UI.ALL)
-        b = UI.Button(self, label="+")
-        self.sizer.Add(b, pos=divmod(i, 2), flag=UI.EXPAND|UI.ALL)
-        self.sizer.SetMinSize(parent.GetClientSize())
+            setattr(b, "UserData", {"Number": number, "Name": name, "Price": price})
+            b.SetOwnFont(font)
+            self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
+        font = UI.Font(24, UI.DEFAULT, UI.NORMAL, UI.NORMAL)
+        b = UI.Button(self, id=DanXiang.IdPlus, label="+")
+        b.SetOwnFont(font)
+        r, c = divmod(i, DanXiang.ColumnNumber)
+        row.append(r)
+        column.append(c)
+        self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
+        b = UI.Button(self, id=DanXiang.IdMinus, label="-")
+        b.SetOwnFont(font)
+        r, c = divmod(i+1, DanXiang.ColumnNumber)
+        row.append(r)
+        column.append(c)
+        self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
+        for r in set(row):
+            self.sizer.AddGrowableRow(r, AUTO)
+        for c in set(column):
+            self.sizer.AddGrowableCol(c, AUTO)
         self.SetSizerAndFit(self.sizer)
+        self.Bind(UI.EVT_BUTTON, self.OnButton)
+    def OnButton(self, evt):
+        _ = evt.GetId()
+        if _ == DanXiang.IdPlus:
+            pass
+        elif _ == DanXiang.IdMinus:
+            pass
+        else:
+            data = self.FindWindowById(_).UserData
+            Record(self, data.get("Name", u"缺失异常"), data).ShowModal()
+            print data
 
 class InOut(UI.Dialog):
     IdAccount = UI.NewId()
@@ -183,7 +288,8 @@ class Frame(UI.Frame):
             UI.TextEntryDialog(self, u"激活码（微信添加nagexiucai好友申请）", u"激活").ShowModal()
         elif _ == Frame.IdDanXiang:
             self.sizer.Add(DanXiang(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
-            self.SetSizer(self.sizer)
+            self.sizer.SetMinSize(self.GetClientSize())
+            self.SetSizerAndFit(self.sizer)
     def OnTimer(self, evt):
         _ = evt.GetId()
         if _ == Frame.IdZhangHuTimer:
