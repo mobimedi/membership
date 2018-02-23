@@ -95,6 +95,13 @@ class TextValidator(UI.PyValidator):
             if keycode < 256 and chr(keycode) in "."+string.digits or keycode in (314, 315, 316, 317, 8):
                 evt.Skip()
 
+class JieZhang(UI.Panel):
+    RowNumber = 3
+    ColumnNumber = 3
+    def __init__(self, parent):
+        UI.Panel.__init__(self, parent)
+        self.sizer = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber)
+
 class HuiYuan(UI.Panel):
     def __init__(self, parent):
         UI.Panel.__init__(self, parent)
@@ -397,6 +404,8 @@ class Frame(UI.Frame):
             self.sizer.Add(TaoCan(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         elif _ == Frame.IdHuiYuan and self.status != Frame.IdHuiYuan:
             self.sizer.Add(HuiYuan(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        elif _ == Frame.IdJieZhang and self.status != Frame.IdJieZhang:
+            self.sizer.Add(JieZhang(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         self.Fit()
         self.PostSizeEvent()
         self.status = _
