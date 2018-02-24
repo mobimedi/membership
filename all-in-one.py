@@ -515,6 +515,8 @@ class Frame(UI.Frame):
         self.SetSizer(self.sizer)
     def OnMenu(self, evt):
         _ = evt.GetId()
+        if _ == self.status:
+            return None
         self.sb.SetStatusText(self.mb.FindItemById(_).GetText())
         self.sizer.Clear(True)
         if _ == Frame.IdDengRu:
