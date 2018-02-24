@@ -558,6 +558,8 @@ class Frame(UI.Frame):
             self.sizer.Add(HuiYuan(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         elif _ == Frame.IdJieZhang and self.status != Frame.IdJieZhang:
             self.sizer.Add(JieZhang(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        elif _ == Frame.IdTuiChu:
+            self.Destroy()
         self.Fit()
         self.PostSizeEvent()
         self.status = _
