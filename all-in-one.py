@@ -24,13 +24,16 @@ class Database:
             Database.CONNECT.close()
     def Initialize(self):
         CREATE = (
-            "CREATE TABLE Member (PhoneNumber TEXT, Name TEXT, Balance FLOAT);",
+            "CREATE TABLE HuiYuan (PhoneNumber TEXT, Name TEXT, Balance FLOAT);",
             "CREATE TABLE DanXiang (Number TEXT, Name TEXT, Price FLOAT);",
-            "CREATE TABLE TaoCan (Combination TEXT, Name TEXT, Price FLOAT);"
+            "CREATE TABLE TaoCan (Combination TEXT, Name TEXT, Price FLOAT);",
+            "CREATE TABLE YouHui (Number TEXT, Activity TEXT, Factor FLOAT);",
+            "CREATE TABLE ZhangDan (PhoneNumber TEXT, Service TEXT, Discount TEXT, Fee FLOAT, Balance FLOAT);"
         )
         INSERT = (
-            u"INSERT INTO Member VALUES ('086182029*****', '那个秀才', 33.33);",
-            u"INSERT INTO Member VALUES ('086182918*****', '大海', 77.77);",
+            u"INSERT INTO HuiYuan VALUES ('086182029*****', '那个秀才', 33.33);",
+            u"INSERT INTO HuiYuan VALUES ('086182918*****', '大海', 77.77);",
+
             u"INSERT INTO DanXiang VALUES ('X', '吹一', 30.00);",
             u"INSERT INTO DanXiang VALUES ('Y', '染一', 90.00);",
             u"INSERT INTO DanXiang VALUES ('Z', '洗二', 88.00);",
@@ -45,9 +48,14 @@ class Database:
             u"INSERT INTO DanXiang VALUES ('I', '拉二', 18.00);",
             u"INSERT INTO DanXiang VALUES ('J', '剪一', 19.00);",
             u"INSERT INTO DanXiang VALUES ('K', '剪二', 20.00);",
+
             u"INSERT INTO TaoCan VALUES ('X+Y', '吹一加染一', 55.55);",
             u"INSERT INTO TaoCan VALUES ('Y+Z+D', '染一加洗二加吹二', 99.99);",
-            u"INSERT INTO TaoCan VALUES ('G+H+J', '烫三加垃一加剪一', 29.90);"
+            u"INSERT INTO TaoCan VALUES ('G+H+J', '烫三加垃一加剪一', 29.90);",
+
+            u"INSERT INTO YouHui VALUES ('z', '议价', 1.00);",
+            u"INSERT INTO YouHui VALUES ('i', '新春五折特惠', 0.50);",
+            u"INSERT INTO YouHui VALUES ('j', '开业八八折券', 0.88);"
         )
         for _ in CREATE:
             self.Execute(_)
@@ -69,10 +77,10 @@ class Database:
     def Test(cls):
         self = cls()
         self.Initialize()
-        print self.Execute("SELECT * FROM Member")
-        print self.Execute("SELECT * FROM DanXiang")
-        self.Execute("INSERT INTO DanXiang VALUES ('H', 'What', 22.22)")
-        print self.Execute("SELECT * FROM DanXiang")
+        print self.Execute("SELECT * FROM HuiYuan;")
+        print self.Execute("SELECT * FROM DanXiang;")
+        self.Execute("INSERT INTO DanXiang VALUES ('H', 'What', 22.22);")
+        print self.Execute("SELECT * FROM DanXiang;")
 
 class TextValidator(UI.PyValidator): # FIXME: WX3.0
 # class TextValidator(UI.Validator):
@@ -102,9 +110,11 @@ class JieZhang(UI.Panel):
     ColumnNumber = 3
     HorizontalGap = 5
     VerticalGap = 5
+    IdDue = UI.NewId()
     IdSearch = UI.NewId()
-    IdTotal = UI.NewId()
+    IdBalance = UI.NewId()
     IdPay = UI.NewId()
+    MajorDimension = 11
     def __init__(self, parent):
         UI.Panel.__init__(self, parent)
         self.sizer = UI.BoxSizer(UI.VERTICAL)
@@ -114,24 +124,41 @@ class JieZhang(UI.Panel):
 
         sizerDX = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber) # FIXME: WX3.0 has a __init__(int, int) overload
         # sizerDX = UI.GridSizer(JieZhang.ColumnNumber, gap=(JieZhang.HorizontalGap, JieZhang.VerticalGap))
+        self.checkbox = []
         for number, name, price in _dx:
             cb = UI.CheckBox(self, label=name)
+            setattr(cb, "UserData", {"Number": number, "Name": name, "Price": price})
+            self.checkbox.append(cb)
             sizerDX.Add(cb, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
         staticBoxSizerDX.Add(sizerDX, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
         _tc = parent.database.Execute("SELECT * FROM TaoCan;")
         item = []
+        data = {}
         for combination, name, price in _tc:
             item.append(name)
-        radioBoxTC = UI.RadioBox(self, label=u"套餐", choices=item, majorDimension=JieZhang.ColumnNumber)
+            data[name] = {"Combination": combination, "Name": name, "Price": price}
+        radioBoxTC = UI.RadioBox(self, label=u"套餐", choices=item, majorDimension=JieZhang.MajorDimension)
+        setattr(radioBoxTC, "UserData", data)
         self.sizer.Add(staticBoxSizerDX, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
         self.sizer.Add(radioBoxTC, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        _yh = parent.database.Execute("SELECT * FROM YouHui;")
+        item = []
+        data = {}
+        for number, activity, factor in _yh:
+            item.append(activity)
+            data[activity] = {"Number": number, "Activity": activity, "Factor": factor}
+        radioBoxYH = UI.RadioBox(self, label=u"优惠", choices=item, majorDimension=JieZhang.MajorDimension)
+        setattr(radioBoxYH, "UserData", data)
+        self.sizer.Add(radioBoxYH, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
         sizerH = UI.BoxSizer(UI.HORIZONTAL)
         sizerV = UI.BoxSizer(UI.VERTICAL)
+        self.due = UI.StaticText(self, id=JieZhang.IdDue, label=u"应付：0.00")
         self.search = UI.SearchCtrl(self, id=JieZhang.IdSearch, style=UI.TE_PROCESS_ENTER)
-        self.total = UI.StaticText(self, id=JieZhang.IdTotal, label="0.00", style=UI.BORDER|UI.ALIGN_CENTER)
+        self.balance = UI.StaticText(self, id=JieZhang.IdBalance, label=u"姓名：余额")
         self.pay = UI.Button(self, id=JieZhang.IdPay, label=u"支付")
+        sizerV.Add(self.due, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
         sizerV.Add(self.search, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
-        sizerV.Add(self.total, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerV.Add(self.balance, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
         sizerV.Add(self.pay, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
         sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL) # FIXME: WX3.0 has no Add(int,int,proportion=0,flag=0) compatible
         # sizerH.Add(AUTO, AUTO, proportion=AUTO, flag=UI.EXPAND | UI.ALL)
@@ -139,11 +166,64 @@ class JieZhang(UI.Panel):
         sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         self.sizer.Add(sizerH, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         self.SetSizerAndFit(self.sizer)
-        self.Bind(UI.EVT_SEARCHCTRL_SEARCH_BTN, self.OnSearch)
-        self.Bind(UI.EVT_SEARCHCTRL_CANCEL_BTN, self.OnSearch)
-        self.Bind(UI.EVT_TEXT_ENTER, self.OnSearch)
+        self.search.ShowCancelButton(True)
+        self.search.Bind(UI.EVT_SEARCHCTRL_CANCEL_BTN, self.OnCancel)
+        self.search.Bind(UI.EVT_SEARCHCTRL_SEARCH_BTN, self.OnSearch)
+        self.search.Bind(UI.EVT_TEXT_ENTER, self.OnSearch)
+        self.pay.Disable()
+        self.pay.Bind(UI.EVT_BUTTON, self.OnPay)
+        self.keyword = None
+        self.dx = 0.00
+        self.tc = 0.00
+        self.yh = 1.00
+        self.total = 0.00
+        self.Bind(UI.EVT_CHECKBOX, self.OnCheckBox)
+        radioBoxTC.Bind(UI.EVT_RADIOBOX, self.OnRadioBoxTC)
+        radioBoxYH.Bind(UI.EVT_RADIOBOX, self.OnRadioBoxYH)
+    def OnCancel(self, evt):
+        self.keyword = None
+        self.pay.Disable()
+        self.balance.SetLabelText(u"姓名：余额")
+        self.search.SetValue(UI.EmptyString)
     def OnSearch(self, evt):
-        print u"搜索"
+        keyword = phonenumber = self.search.GetValue()
+        if keyword:
+            record = self.Parent.database.Execute("SELECT * FROM HuiYuan WHERE PhoneNumber='{0}';".format(keyword))
+            if record:
+                phonenumber, name, balance = record[0] # 前提逻辑保证keyword为主键（不重复）
+                assert phonenumber == keyword
+                self.balance.SetLabelText(u"：".join((name, unicode(balance))))
+                self.keyword = keyword
+                self.pay.Enable()
+            else:
+                UI.MessageBox(u"号码‘{0}’还未注册为会员".format(phonenumber), u"抱歉")
+    def OnPay(self, evt):
+        if UI.MessageBox(u"客户{user}同意扣款{money}么".format(user=self.keyword, money=self.total), u"警告", style=UI.OK|UI.CANCEL) == UI.OK:
+            print u"扣款"
+            self.OnCancel(None)
+    def OnCheckBox(self, evt):
+        cb = evt.GetEventObject()
+        _ = cb.UserData.get("Price")
+        if cb.IsChecked():
+            self.dx += _
+        else:
+            self.dx -= _
+        self.UpdateTotal()
+    def OnRadioBoxTC(self, evt):
+        rb = evt.GetEventObject()
+        name = evt.GetString()
+        _ = rb.UserData.get(name).get("Price")
+        self.tc = _
+        self.UpdateTotal()
+    def OnRadioBoxYH(self, evt):
+        rb = evt.GetEventObject()
+        name = evt.GetString()
+        _ = rb.UserData.get(name).get("Factor")
+        self.yh = _
+        self.UpdateTotal()
+    def UpdateTotal(self):
+        self.total = (self.dx + self.tc) * self.yh
+        self.due.SetLabelText(u"应付：%.2f" % self.total)
 
 class HuiYuan(UI.Panel):
     def __init__(self, parent):
@@ -153,7 +233,7 @@ class HuiYuan(UI.Panel):
         self.dvlc.AppendTextColumn("PhoneNumber", width=160)
         self.dvlc.AppendTextColumn("Name", width=240)
         self.dvlc.AppendTextColumn("Balance", width=120)
-        _ = parent.database.Execute("SELECT * FROM Member;")
+        _ = parent.database.Execute("SELECT * FROM HuiYuan;")
         for phonenumber, name, balance in _:
             self.dvlc.AppendItem((phonenumber, name, unicode(balance)))
         self.sizer.Add(self.dvlc, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
@@ -258,7 +338,7 @@ class DanXiang(UI.Panel):
     IdPlus = UI.NewId()
     def __init__(self, parent):
         UI.Panel.__init__(self, parent)
-        self.sizer = UI.GridBagSizer(5, 5) # TODO: 找一种行列不固定且会根据元素总数及尺寸自适应的布局框架
+        self.sizer = UI.GridBagSizer(5, 5) # FIXME: GridBagSizer -> GridSizer
         i = c = r = 0
         _ = parent.database.Execute("SELECT * FROM DanXiang;")
         column = []
