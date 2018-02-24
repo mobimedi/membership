@@ -92,11 +92,11 @@ class Database:
         self.Execute("INSERT INTO DanXiang VALUES ('H', 'What', 22.22);")
         print self.Execute("SELECT * FROM DanXiang;")
 
-class TextValidator(UI.PyValidator): # FIXME: WX3.0
-# class TextValidator(UI.Validator):
+# class TextValidator(UI.PyValidator): # FIXME: WX3.0
+class TextValidator(UI.Validator):
     def __init__(self, flag):
-        UI.PyValidator.__init__(self)
-        # UI.Validator.__init__(self)
+        # UI.PyValidator.__init__(self)
+        UI.Validator.__init__(self)
         self.flag = flag
         self.Bind(UI.EVT_CHAR, self.OnChar)
     def Clone(self):
@@ -152,8 +152,8 @@ class JieZhang(UI.Panel):
         staticBoxSizerDX = UI.StaticBoxSizer(staticBoxDX, UI.VERTICAL)
         _dx = parent.database.Execute("SELECT * FROM DanXiang;")
 
-        sizerDX = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber) # FIXME: WX3.0 has a __init__(int, int) overload
-        # sizerDX = UI.GridSizer(JieZhang.ColumnNumber, gap=(JieZhang.HorizontalGap, JieZhang.VerticalGap))
+        # sizerDX = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber) # FIXME: WX3.0 has a __init__(int, int) overload
+        sizerDX = UI.GridSizer(JieZhang.ColumnNumber, gap=(JieZhang.HorizontalGap, JieZhang.VerticalGap))
         self.checkbox = []
         for number, name, price in _dx:
             cb = UI.CheckBox(self, label=name)
@@ -190,8 +190,8 @@ class JieZhang(UI.Panel):
         sizerV.Add(self.search, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
         sizerV.Add(self.balance, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
         sizerV.Add(self.pay, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
-        sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL) # FIXME: WX3.0 has no Add(int,int,proportion=0,flag=0) compatible
-        # sizerH.Add(AUTO, AUTO, proportion=AUTO, flag=UI.EXPAND | UI.ALL)
+        # sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL) # FIXME: WX3.0 has no Add(int,int,proportion=0,flag=0) compatible
+        sizerH.Add(AUTO, AUTO, proportion=AUTO, flag=UI.EXPAND | UI.ALL)
         sizerH.Add(sizerV, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
         sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         self.sizer.Add(sizerH, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
@@ -231,6 +231,7 @@ class JieZhang(UI.Panel):
         if UI.MessageBox(u"客户{user}同意扣款{money}么".format(user=self.keyword, money=self.total), u"警告", style=UI.OK|UI.CANCEL) == UI.OK:
             print u"扣款", TIMESTAMP()
             # self.Parent.database.Execute("UPDATE HuiYuan SET ~ WHERE 'PhoneNumber'='{0}';".format(self.keyword))
+            # TODO: 需要把Service字段做成“单项（单价）加单项（单价）……·套价，单项（单价）”以应对本次交易后单项或套餐可能的修改否
             # self.Parent.database.Execute("INSERT INTO QingDan VALUES ();")
             self.OnCancel(None)
             # TODO: 转向清单页签
@@ -393,8 +394,8 @@ class TaoCan(UI.Panel):
         for combination, name, price in _:
             data = {"Combination": combination, "Name": name, "Price": price}
             b = UI.Button(self, label=name)
-            b.SetToolTipString(unicode(price)) # FIXME: WX3.0
-            # b.SetToolTip(unicode(price))
+            # b.SetToolTipString(unicode(price)) # FIXME: WX3.0
+            b.SetToolTip(unicode(price))
             b.SetFont(font)
             setattr(b, "UserData", data)
             self.UserDataTC[combination] = data
@@ -437,8 +438,8 @@ class DanXiang(UI.Panel):
             row.append(r)
             i += 1
             b = UI.Button(self, label=name)
-            b.SetToolTipString(unicode(price)) # FIXME: WX3.0
-            # b.SetToolTip(unicode(price))
+            # b.SetToolTipString(unicode(price)) # FIXME: WX3.0
+            b.SetToolTip(unicode(price))
             setattr(b, "UserData", {"Number": number, "Name": name, "Price": price})
             b.SetFont(font)
             self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
@@ -483,6 +484,7 @@ class DanXiang(UI.Panel):
             data = __.UserData
             dlg = Record(self, data.get("Name", u"缺失异常"), data)
             dlg.ShowModal()
+            # TODO: 参与套餐的单项禁止删改
             if dlg.status == Record.IdOK:
                 __.SetLabel(data.get("Name", u"缺失异常"))
                 # FIXME: 按钮标注文字加长窗口不能自适应（需手动触发）
