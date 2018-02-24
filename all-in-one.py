@@ -24,6 +24,8 @@ class Database:
             Database.CONNECT.close()
     def Initialize(self):
         CREATE = (
+            "CREATE TABLE GuanLi (ZunXingDaMing TEXT, DaSiDouBuShuo TEXT);",
+
             "CREATE TABLE HuiYuan (PhoneNumber TEXT, Name TEXT, Balance FLOAT);",
             "CREATE TABLE DanXiang (Number TEXT, Name TEXT, Price FLOAT);",
             "CREATE TABLE TaoCan (Combination TEXT, Name TEXT, Price FLOAT);",
@@ -31,8 +33,11 @@ class Database:
             "CREATE TABLE ZhangDan (PhoneNumber TEXT, Service TEXT, Discount TEXT, Fee FLOAT, Balance FLOAT);"
         )
         INSERT = (
+            u"INSERT INTO GuanLi VALUES ('Administrator', 'nagexiucai.com');",
+
             u"INSERT INTO HuiYuan VALUES ('086182029*****', '那个秀才', 33.33);",
             u"INSERT INTO HuiYuan VALUES ('086182918*****', '大海', 77.77);",
+            u"INSERT INTO HuiYuan VALUES ('08613893859438', '狗娃', 22.22);",
 
             u"INSERT INTO DanXiang VALUES ('X', '吹一', 30.00);",
             u"INSERT INTO DanXiang VALUES ('Y', '染一', 90.00);",
@@ -412,12 +417,13 @@ class InOut(UI.Dialog):
     IdAccount = UI.NewId()
     IdPassword = UI.NewId()
     IdOK = UI.NewId()
+    User = None
     def __init__(self, parent):
         UI.Dialog.__init__(self, parent, title=u"管理")
         self.accountLabel = UI.StaticText(self, label=u"账户", size=(AUTO, 20))
         self.account = UI.TextCtrl(self, id=InOut.IdAccount, name=u"账户", size=(AUTO, 20), value="Administrator")
         self.passwordLabel = UI.StaticText(self, label=u"密码", size=(AUTO, 20))
-        self.password = UI.TextCtrl(self, id=InOut.IdPassword, name=u"密码", size=(AUTO, 20), style=UI.TE_PASSWORD)
+        self.password = UI.TextCtrl(self, id=InOut.IdPassword, name=u"密码", size=(AUTO, 20), style=UI.TE_PASSWORD|UI.TE_PROCESS_ENTER)
         self.password.SetFocus()
         self.kidSizerA = UI.BoxSizer(UI.HORIZONTAL)
         self.kidSizerA.Add(self.accountLabel, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
@@ -432,6 +438,22 @@ class InOut(UI.Dialog):
         self.sizer.Add(self.ok, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
         self.SetSizerAndFit(self.sizer)
         self.CenterOnParent()
+        self.ok.Bind(UI.EVT_BUTTON, self.OnOK)
+        self.password.Bind(UI.EVT_TEXT_ENTER, self.OnOK)
+    def OnOK(self, evt):
+        account = self.account.GetValue()
+        password = self.password.GetValue()
+        _ = self.Parent.database.Execute("SELECT * FROM GuanLi WHERE ZunXingDaMing='{account}' AND DaSiDouBuShuo='{password}';".format(account=account, password=password))
+        if _:
+            InOut.User = account
+            self.Destroy()
+    @staticmethod
+    def Authenticate(): # TODO: 制作和许可位码相关的鉴权
+        if InOut.User is None:
+            UI.MessageBox(u"请登录管理账户", u"警告")
+            return False
+        else:
+            return True
 
 class Frame(UI.Frame):
     IdZhangHuTimer = UI.NewId()
@@ -515,12 +537,15 @@ class Frame(UI.Frame):
         self.SetSizer(self.sizer)
     def OnMenu(self, evt):
         _ = evt.GetId()
-        if _ == self.status:
+        if _ == self.status and _ is not Frame.IdDengRu:
             return None
         self.sb.SetStatusText(self.mb.FindItemById(_).GetText())
         self.sizer.Clear(True)
         if _ == Frame.IdDengRu:
+            InOut.User = None
             InOut(self).ShowModal()
+            if not InOut.Authenticate():
+                self.Destroy()
         elif _ == Frame.IdZuoZhe:
             UI.MessageBox(u"那个秀才［www.nagexiucai.com］", u"作者")
         elif _ == Frame.IdJiHuo:
@@ -540,6 +565,8 @@ class Frame(UI.Frame):
         _ = evt.GetId()
         if _ == Frame.IdZhangHuTimer:
             InOut(self).ShowModal()
+            if not InOut.Authenticate():
+                self.Destroy()
 
 class App(UI.App):
     def __init__(self, frame):
