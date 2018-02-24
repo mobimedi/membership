@@ -10,6 +10,9 @@ import sqlite3 as DB
 import os
 import sys
 import string
+import datetime
+
+TIMESTAMP = lambda: datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 FIXED = 0
 DEFAULT = AUTO = -1
@@ -226,8 +229,11 @@ class JieZhang(UI.Panel):
                 UI.MessageBox(u"号码‘{0}’还未注册为会员".format(phonenumber), u"抱歉")
     def OnPay(self, evt):
         if UI.MessageBox(u"客户{user}同意扣款{money}么".format(user=self.keyword, money=self.total), u"警告", style=UI.OK|UI.CANCEL) == UI.OK:
-            print u"扣款"
+            print u"扣款", TIMESTAMP()
+            # self.Parent.database.Execute("UPDATE HuiYuan SET ~ WHERE 'PhoneNumber'='{0}';".format(self.keyword))
+            # self.Parent.database.Execute("INSERT INTO QingDan VALUES ();")
             self.OnCancel(None)
+            # TODO: 转向清单页签
     def OnCheckBox(self, evt):
         cb = evt.GetEventObject()
         _ = cb.UserData.get("Price")
