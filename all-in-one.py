@@ -29,25 +29,25 @@ class Database:
             "CREATE TABLE TaoCan (Combination TEXT, Name TEXT, Price FLOAT);"
         )
         INSERT = (
-            "INSERT INTO Member VALUES ('086182029*****', '那个秀才', 33.33);",
-            "INSERT INTO Member VALUES ('086182918*****', '大海', 77.77);",
-            "INSERT INTO DanXiang VALUES ('X', '吹一', 30.00);",
-            "INSERT INTO DanXiang VALUES ('Y', '染一', 90.00);",
-            "INSERT INTO DanXiang VALUES ('Z', '洗二', 88.00);",
-            "INSERT INTO DanXiang VALUES ('A', '洗一', 10.00);",
-            "INSERT INTO DanXiang VALUES ('B', '染二', 11.00);",
-            "INSERT INTO DanXiang VALUES ('C', '染三', 12.00);",
-            "INSERT INTO DanXiang VALUES ('D', '吹二', 13.00);",
-            "INSERT INTO DanXiang VALUES ('E', '烫一', 14.00);",
-            "INSERT INTO DanXiang VALUES ('F', '烫二', 15.00);",
-            "INSERT INTO DanXiang VALUES ('G', '烫三', 16.00);",
-            "INSERT INTO DanXiang VALUES ('H', '拉一', 17.00);",
-            "INSERT INTO DanXiang VALUES ('I', '拉二', 18.00);",
-            "INSERT INTO DanXiang VALUES ('J', '剪一', 19.00);",
-            "INSERT INTO DanXiang VALUES ('K', '剪二', 20.00);",
-            "INSERT INTO TaoCan VALUES ('X+Y', '吹一加染一', 55.55);",
-            "INSERT INTO TaoCan VALUES ('Y+Z+D', '染一加洗二加吹二', 99.99);",
-            "INSERT INTO TaoCan VALUES ('G+H+J', '烫三加垃一加剪一', 29.90);"
+            u"INSERT INTO Member VALUES ('086182029*****', '那个秀才', 33.33);",
+            u"INSERT INTO Member VALUES ('086182918*****', '大海', 77.77);",
+            u"INSERT INTO DanXiang VALUES ('X', '吹一', 30.00);",
+            u"INSERT INTO DanXiang VALUES ('Y', '染一', 90.00);",
+            u"INSERT INTO DanXiang VALUES ('Z', '洗二', 88.00);",
+            u"INSERT INTO DanXiang VALUES ('A', '洗一', 10.00);",
+            u"INSERT INTO DanXiang VALUES ('B', '染二', 11.00);",
+            u"INSERT INTO DanXiang VALUES ('C', '染三', 12.00);",
+            u"INSERT INTO DanXiang VALUES ('D', '吹二', 13.00);",
+            u"INSERT INTO DanXiang VALUES ('E', '烫一', 14.00);",
+            u"INSERT INTO DanXiang VALUES ('F', '烫二', 15.00);",
+            u"INSERT INTO DanXiang VALUES ('G', '烫三', 16.00);",
+            u"INSERT INTO DanXiang VALUES ('H', '拉一', 17.00);",
+            u"INSERT INTO DanXiang VALUES ('I', '拉二', 18.00);",
+            u"INSERT INTO DanXiang VALUES ('J', '剪一', 19.00);",
+            u"INSERT INTO DanXiang VALUES ('K', '剪二', 20.00);",
+            u"INSERT INTO TaoCan VALUES ('X+Y', '吹一加染一', 55.55);",
+            u"INSERT INTO TaoCan VALUES ('Y+Z+D', '染一加洗二加吹二', 99.99);",
+            u"INSERT INTO TaoCan VALUES ('G+H+J', '烫三加垃一加剪一', 29.90);"
         )
         for _ in CREATE:
             self.Execute(_)
@@ -74,9 +74,11 @@ class Database:
         self.Execute("INSERT INTO DanXiang VALUES ('H', 'What', 22.22)")
         print self.Execute("SELECT * FROM DanXiang")
 
-class TextValidator(UI.PyValidator):
+class TextValidator(UI.PyValidator): # FIXME: WX3.0
+# class TextValidator(UI.Validator):
     def __init__(self, flag):
         UI.PyValidator.__init__(self)
+        # UI.Validator.__init__(self)
         self.flag = flag
         self.Bind(UI.EVT_CHAR, self.OnChar)
     def Clone(self):
@@ -96,11 +98,52 @@ class TextValidator(UI.PyValidator):
                 evt.Skip()
 
 class JieZhang(UI.Panel):
-    RowNumber = 3
+    RowNumber = 0
     ColumnNumber = 3
+    HorizontalGap = 5
+    VerticalGap = 5
+    IdSearch = UI.NewId()
+    IdTotal = UI.NewId()
+    IdPay = UI.NewId()
     def __init__(self, parent):
         UI.Panel.__init__(self, parent)
-        self.sizer = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber)
+        self.sizer = UI.BoxSizer(UI.VERTICAL)
+        staticBoxDX = UI.StaticBox(self, label=u"单项")
+        staticBoxSizerDX = UI.StaticBoxSizer(staticBoxDX, UI.VERTICAL)
+        _dx = parent.database.Execute("SELECT * FROM DanXiang;")
+
+        sizerDX = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber) # FIXME: WX3.0 has a __init__(int, int) overload
+        # sizerDX = UI.GridSizer(JieZhang.ColumnNumber, gap=(JieZhang.HorizontalGap, JieZhang.VerticalGap))
+        for number, name, price in _dx:
+            cb = UI.CheckBox(self, label=name)
+            sizerDX.Add(cb, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        staticBoxSizerDX.Add(sizerDX, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        _tc = parent.database.Execute("SELECT * FROM TaoCan;")
+        item = []
+        for combination, name, price in _tc:
+            item.append(name)
+        radioBoxTC = UI.RadioBox(self, label=u"套餐", choices=item, majorDimension=JieZhang.ColumnNumber)
+        self.sizer.Add(staticBoxSizerDX, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        self.sizer.Add(radioBoxTC, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerH = UI.BoxSizer(UI.HORIZONTAL)
+        sizerV = UI.BoxSizer(UI.VERTICAL)
+        self.search = UI.SearchCtrl(self, id=JieZhang.IdSearch, style=UI.TE_PROCESS_ENTER)
+        self.total = UI.StaticText(self, id=JieZhang.IdTotal, label="0.00", style=UI.BORDER|UI.ALIGN_CENTER)
+        self.pay = UI.Button(self, id=JieZhang.IdPay, label=u"支付")
+        sizerV.Add(self.search, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerV.Add(self.total, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerV.Add(self.pay, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL) # FIXME: WX3.0 has no Add(int,int,proportion=0,flag=0) compatible
+        # sizerH.Add(AUTO, AUTO, proportion=AUTO, flag=UI.EXPAND | UI.ALL)
+        sizerH.Add(sizerV, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.sizer.Add(sizerH, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.SetSizerAndFit(self.sizer)
+        self.Bind(UI.EVT_SEARCHCTRL_SEARCH_BTN, self.OnSearch)
+        self.Bind(UI.EVT_SEARCHCTRL_CANCEL_BTN, self.OnSearch)
+        self.Bind(UI.EVT_TEXT_ENTER, self.OnSearch)
+    def OnSearch(self, evt):
+        print u"搜索"
 
 class HuiYuan(UI.Panel):
     def __init__(self, parent):
@@ -184,7 +227,8 @@ class TaoCan(UI.Panel):
         for combination, name, price in _:
             data = {"Combination": combination, "Name": name, "Price": price}
             b = UI.Button(self, label=name)
-            b.SetToolTipString(unicode(price))
+            b.SetToolTipString(unicode(price)) # FIXME: WX3.0
+            # b.SetToolTip(unicode(price))
             b.SetFont(font)
             setattr(b, "UserData", data)
             self.UserDataTC[combination] = data
@@ -227,7 +271,8 @@ class DanXiang(UI.Panel):
             row.append(r)
             i += 1
             b = UI.Button(self, label=name)
-            b.SetToolTipString(unicode(price))
+            b.SetToolTipString(unicode(price)) # FIXME: WX3.0
+            # b.SetToolTip(unicode(price))
             setattr(b, "UserData", {"Number": number, "Name": name, "Price": price})
             b.SetFont(font)
             self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
