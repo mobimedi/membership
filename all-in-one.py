@@ -14,6 +14,7 @@ import datetime
 
 TIMESTAMP = lambda: datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+UNIQUE = 1
 FIXED = 0
 DEFAULT = AUTO = -1
 
@@ -151,7 +152,6 @@ class JieZhang(UI.Panel):
         staticBoxDX = UI.StaticBox(self, label=u"单项")
         staticBoxSizerDX = UI.StaticBoxSizer(staticBoxDX, UI.VERTICAL)
         _dx = parent.database.Execute("SELECT * FROM DanXiang;")
-
         # sizerDX = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber) # FIXME: WX3.0 has a __init__(int, int) overload
         sizerDX = UI.GridSizer(JieZhang.ColumnNumber, gap=(JieZhang.HorizontalGap, JieZhang.VerticalGap))
         self.checkbox = []
@@ -235,6 +235,10 @@ class JieZhang(UI.Panel):
             # self.Parent.database.Execute("INSERT INTO QingDan VALUES ();")
             self.OnCancel(None)
             # TODO: 转向清单页签
+            # event = UI.MenuEvent(type=UI.wxEVT_MENU, id=Frame.IdQingDan, menu=self.Parent.bill) # FIXME: how to pass data to event parameter of its handler
+            event = UI.PyCommandEvent(Frame.EventQingDanType, Frame.IdQingDan)
+            event.UserData = self.keyword
+            UI.PostEvent(self.GetParent(), event)
     def OnCheckBox(self, evt):
         cb = evt.GetEventObject()
         _ = cb.UserData.get("Price")
@@ -553,6 +557,8 @@ class Frame(UI.Frame):
     IdQingDan = UI.NewId()
     IdJiHuo = UI.NewId()
     IdZuoZhe = UI.NewId()
+    EventQingDanType = UI.NewEventType()
+    EventQingDanBinder = UI.PyEventBinder(EventQingDanType, UNIQUE)
     def __init__(self):
         UI.Frame.__init__(self, None, title=u"会员管理")
         self.database = Database()
@@ -618,6 +624,7 @@ class Frame(UI.Frame):
         self.sizer = UI.BoxSizer(UI.VERTICAL)
         self.sizer.SetMinSize((620, 400))
         self.SetSizer(self.sizer)
+        self.Bind(Frame.EventQingDanBinder, self.OnMenu)
     def OnMenu(self, evt):
         _ = evt.GetId()
         if _ == self.status and _ is not Frame.IdDengRu:
@@ -642,9 +649,13 @@ class Frame(UI.Frame):
         elif _ == Frame.IdJieZhang and self.status != Frame.IdJieZhang:
             self.sizer.Add(JieZhang(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         elif _ == Frame.IdQingDan and self.status != Frame.IdQingDan:
-            dlg = UI.TextEntryDialog(self, u"输入要查询的会员号码", u"清单")
-            dlg.ShowModal()
-            self.sizer.Add(QingDan(self, dlg.GetValue()), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+            # if isinstance(evt, UI.MenuEvent):
+            if hasattr(evt, "UserData"):
+                self.sizer.Add(QingDan(self, evt.UserData), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+            else:
+                dlg = UI.TextEntryDialog(self, u"输入要查询的会员号码", u"清单")
+                dlg.ShowModal()
+                self.sizer.Add(QingDan(self, dlg.GetValue()), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         elif _ == Frame.IdTuiChu:
             self.Destroy()
         self.Fit()
