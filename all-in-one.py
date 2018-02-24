@@ -109,7 +109,10 @@ class TextValidator(UI.PyValidator): # FIXME: WX3.0
         keycode = evt.GetKeyCode()
         print keycode
         if self.flag is float:
-            if keycode < 256 and chr(keycode) in "."+string.digits or keycode in (314, 315, 316, 317, 8):
+            if keycode < 256 and chr(keycode) in "+-."+string.digits or keycode in (314, 315, 316, 317, 8):
+                evt.Skip()
+        elif self.flag is int:
+            if keycode < 256 and chr(keycode) in "+-"+string.digits or keycode in (314, 315, 316, 317, 8):
                 evt.Skip()
 
 class QingDan(UI.Panel):
@@ -250,10 +253,14 @@ class JieZhang(UI.Panel):
         self.due.SetLabelText(u"应付：%.2f" % self.total)
 
 class HuiYuan(UI.Panel):
+    IdCreate = UI.NewId()
+    IdDelete = UI.NewId()
+    IdModify = UI.NewId()
     def __init__(self, parent):
         UI.Panel.__init__(self, parent)
         self.sizer = UI.BoxSizer(UI.VERTICAL)
         self.dvlc = UIDV.DataViewListCtrl(self)
+        self.title = ("PhoneNumber", "Name", "Balance", "Credit")
         self.dvlc.AppendTextColumn("PhoneNumber", width=130)
         self.dvlc.AppendTextColumn("Name", width=180)
         self.dvlc.AppendTextColumn("Balance", width=90)
@@ -262,10 +269,55 @@ class HuiYuan(UI.Panel):
         for phonenumber, name, balance, credit in _:
             self.dvlc.AppendItem((phonenumber, name, unicode(balance), unicode(credit)))
         self.sizer.Add(self.dvlc, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        # sizerH = UI.BoxSizer(UI.HORIZONTAL)
+        # b = UI.Button(self, id=HuiYuan.IdCreate, label="+")
+        # sizerH.Add(b, proportion=FIXED)
+        # b = UI.Button(self, id=HuiYuan.IdDelete, label="-")
+        # sizerH.Add(b, proportion=FIXED)
+        # b = UI.Button(self, id=HuiYuan.IdModify, label="/")
+        # sizerH.Add(b, proportion=FIXED)
+        # self.sizer.Add(sizerH, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
         self.SetSizerAndFit(self.sizer)
-        self.Bind(UIDV.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.OnDataViewItemContextMenu)
-    def OnDataViewItemContextMenu(self, evt):
-        pass
+        # self.Bind(UI.EVT_BUTTON, self.OnButton)
+        self.dvlc.Bind(UIDV.EVT_DATAVIEW_ITEM_ACTIVATED, self.OnDataViewItem)
+    def OnDataViewItem(self, evt):
+        _ = evt.GetEventObject()
+        r = _.GetSelectedRow()
+        n = _.GetColumnCount()
+        data = {}
+        for i, k in enumerate(self.title):
+            data[k] = _.GetValue(r, i)
+        dlg = Record(self, u"", data)
+        dlg.ShowModal()
+        if dlg.status == Record.IdRemove:
+            UI.MessageBox(u"删除会员需要激活", u"可惜")
+            # self.Parent.database.Execute("DELETE FROM HuiYuan WHERE PhoneNumber='{0}';".format(data.get("PhoneNumber")))
+            # _.DeleteItem(r)
+        elif dlg.status == Record.IdOK:
+            if data.get("PhoneNumber") != _.GetValue(r, 0): # TODO: 如果主键被修改认为是新增
+                record = []
+                for x in self.title:
+                    xx = data.get(x)
+                    record.append(float(xx) if x == "Balance" else int(xx) if x == "Credit" else xx)
+                record = tuple(record)
+                _.AppendItem(record)
+                self.Parent.database.Execute("INSERT INTO HuiYuan VALUES ('%s', '%s', %0.2f, %d);" % record)
+            else:
+                for i, x in enumerate(self.title):
+                    _.SetValue(data.get(x), r, i)
+                data["Balance"] = float(data.get("Balance"))
+                data["Credit"] = int(data.get("Credit"))
+                phonenumber = data.pop("PhoneNumber")
+                accusative = u", ".join(["=".join((k, `v`)) if not isinstance(v, unicode) else "%s='%s'" % (k, v) for k, v in data.iteritems()])
+                self.Parent.database.Execute("UPDATE HuiYuan SET %s WHERE PhoneNumber='{0}';".format(phonenumber) % accusative)
+    # def OnButton(self, evt):
+    #     _ = evt.GetId()
+    #     if _ == HuiYuan.IdCreate:
+    #         print u"新增"
+    #     elif _ == HuiYuan.IdDelete:
+    #         print u"删除"
+    #     elif _ == HuiYuan.IdModify:
+    #         print u"修改"
 
 class Record(UI.Dialog):
     IdOK = UI.NewId()
@@ -279,6 +331,9 @@ class Record(UI.Dialog):
             st = UI.StaticText(self, label=k, size=(80, 20))
             if isinstance(v, float): # for price etc
                 tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(float)) # TODO: 主键禁止修改
+                tc.Validate()
+            elif isinstance(v, int):
+                tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(int))
                 tc.Validate()
             else:
                 tc = UI.TextCtrl(self, value=v, name=k, size=(120, 20))
