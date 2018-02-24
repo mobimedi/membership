@@ -26,18 +26,18 @@ class Database:
         CREATE = (
             "CREATE TABLE GuanLi (ZunXingDaMing TEXT, DaSiDouBuShuo TEXT);",
 
-            "CREATE TABLE HuiYuan (PhoneNumber TEXT, Name TEXT, Balance FLOAT);",
+            "CREATE TABLE HuiYuan (PhoneNumber TEXT, Name TEXT, Balance FLOAT, Credit INT);",
             "CREATE TABLE DanXiang (Number TEXT, Name TEXT, Price FLOAT);",
             "CREATE TABLE TaoCan (Combination TEXT, Name TEXT, Price FLOAT);",
             "CREATE TABLE YouHui (Number TEXT, Activity TEXT, Factor FLOAT);",
-            "CREATE TABLE ZhangDan (PhoneNumber TEXT, Service TEXT, Discount TEXT, Fee FLOAT, Balance FLOAT);"
+            "CREATE TABLE ZhangDan (PhoneNumber TEXT, Service TEXT, Discount TEXT, Fee FLOAT, Balance FLOAT, Timestamp TEXT);"
         )
         INSERT = (
             u"INSERT INTO GuanLi VALUES ('Administrator', 'nagexiucai.com');",
 
-            u"INSERT INTO HuiYuan VALUES ('086182029*****', '那个秀才', 33.33);",
-            u"INSERT INTO HuiYuan VALUES ('086182918*****', '大海', 77.77);",
-            u"INSERT INTO HuiYuan VALUES ('08613893859438', '狗娃', 22.22);",
+            u"INSERT INTO HuiYuan VALUES ('086182029*****', '那个秀才', 33.33, 0);",
+            u"INSERT INTO HuiYuan VALUES ('086182918*****', '大海', 77.77, 0);",
+            u"INSERT INTO HuiYuan VALUES ('08613893859438', '狗娃', 22.22, 0);",
 
             u"INSERT INTO DanXiang VALUES ('X', '吹一', 30.00);",
             u"INSERT INTO DanXiang VALUES ('Y', '染一', 90.00);",
@@ -195,7 +195,7 @@ class JieZhang(UI.Panel):
         if keyword:
             record = self.Parent.database.Execute("SELECT * FROM HuiYuan WHERE PhoneNumber='{0}';".format(keyword))
             if record:
-                phonenumber, name, balance = record[0] # 前提逻辑保证keyword为主键（不重复）
+                phonenumber, name, balance, credit = record[0] # 前提逻辑保证keyword为主键（不重复）
                 assert phonenumber == keyword
                 self.balance.SetLabelText(u"：".join((name, unicode(balance))))
                 self.keyword = keyword
@@ -235,12 +235,13 @@ class HuiYuan(UI.Panel):
         UI.Panel.__init__(self, parent)
         self.sizer = UI.BoxSizer(UI.VERTICAL)
         self.dvlc = UIDV.DataViewListCtrl(self)
-        self.dvlc.AppendTextColumn("PhoneNumber", width=160)
-        self.dvlc.AppendTextColumn("Name", width=240)
-        self.dvlc.AppendTextColumn("Balance", width=120)
+        self.dvlc.AppendTextColumn("PhoneNumber", width=130)
+        self.dvlc.AppendTextColumn("Name", width=180)
+        self.dvlc.AppendTextColumn("Balance", width=90)
+        self.dvlc.AppendTextColumn("Credit", width=70)
         _ = parent.database.Execute("SELECT * FROM HuiYuan;")
-        for phonenumber, name, balance in _:
-            self.dvlc.AppendItem((phonenumber, name, unicode(balance)))
+        for phonenumber, name, balance, credit in _:
+            self.dvlc.AppendItem((phonenumber, name, unicode(balance), unicode(credit)))
         self.sizer.Add(self.dvlc, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         self.SetSizerAndFit(self.sizer)
         self.Bind(UIDV.EVT_DATAVIEW_ITEM_CONTEXT_MENU, self.OnDataViewItemContextMenu)
