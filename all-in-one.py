@@ -30,14 +30,14 @@ class Database:
             "CREATE TABLE DanXiang (Number TEXT, Name TEXT, Price FLOAT);",
             "CREATE TABLE TaoCan (Combination TEXT, Name TEXT, Price FLOAT);",
             "CREATE TABLE YouHui (Number TEXT, Activity TEXT, Factor FLOAT);",
-            "CREATE TABLE ZhangDan (PhoneNumber TEXT, Service TEXT, Discount TEXT, Fee FLOAT, Balance FLOAT, Timestamp TEXT);"
+            "CREATE TABLE QingDan (PhoneNumber TEXT, Service TEXT, Discount TEXT, Fee FLOAT, Balance FLOAT, Timestamp TEXT);"
         )
         INSERT = (
             u"INSERT INTO GuanLi VALUES ('Administrator', 'nagexiucai.com');",
 
             u"INSERT INTO HuiYuan VALUES ('086182029*****', '那个秀才', 33.33, 0);",
             u"INSERT INTO HuiYuan VALUES ('086182918*****', '大海', 77.77, 0);",
-            u"INSERT INTO HuiYuan VALUES ('08613893859438', '狗娃', 22.22, 0);",
+            u"INSERT INTO HuiYuan VALUES ('08688888888888', '狗娃', 228.22, 7);",
 
             u"INSERT INTO DanXiang VALUES ('X', '吹一', 30.00);",
             u"INSERT INTO DanXiang VALUES ('Y', '染一', 90.00);",
@@ -60,7 +60,9 @@ class Database:
 
             u"INSERT INTO YouHui VALUES ('z', '议价', 1.00);",
             u"INSERT INTO YouHui VALUES ('i', '新春五折特惠', 0.50);",
-            u"INSERT INTO YouHui VALUES ('j', '开业八八折券', 0.88);"
+            u"INSERT INTO YouHui VALUES ('j', '开业八八折券', 0.88);",
+
+            u"INSERT INTO QingDan VALUES ('08688888888888', '吹一加染一，洗二', '新春五折特惠', 71.78, 228.22, '2018-02-15 20:30:00');"
         )
         for _ in CREATE:
             self.Execute(_)
@@ -109,6 +111,23 @@ class TextValidator(UI.PyValidator): # FIXME: WX3.0
         if self.flag is float:
             if keycode < 256 and chr(keycode) in "."+string.digits or keycode in (314, 315, 316, 317, 8):
                 evt.Skip()
+
+class QingDan(UI.Panel):
+    def __init__(self, parent, who=None):
+        UI.Panel.__init__(self, parent)
+        self.sizer = UI.BoxSizer(UI.VERTICAL)
+        self.dvlc = UIDV.DataViewListCtrl(self)
+        self.dvlc.AppendTextColumn("PhoneNumber", width=130)
+        self.dvlc.AppendTextColumn("Service", width=180)
+        self.dvlc.AppendTextColumn("Discount", width=120)
+        self.dvlc.AppendTextColumn("Fee", width=90)
+        self.dvlc.AppendTextColumn("Balance", width=90)
+        self.dvlc.AppendTextColumn("Timestamp", width=160)
+        _ = parent.database.Execute("SELECT * FROM QingDan WHERE PhoneNumber='{0}';".format(who))
+        for phonenumber, service, discount, fee, balance, timestamp in _:
+            self.dvlc.AppendItem((phonenumber, service, discount, unicode(fee), unicode(balance), timestamp))
+        self.sizer.Add(self.dvlc, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        self.SetSizerAndFit(self.sizer)
 
 class JieZhang(UI.Panel):
     RowNumber = 0
@@ -559,6 +578,10 @@ class Frame(UI.Frame):
             self.sizer.Add(HuiYuan(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         elif _ == Frame.IdJieZhang and self.status != Frame.IdJieZhang:
             self.sizer.Add(JieZhang(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
+        elif _ == Frame.IdQingDan and self.status != Frame.IdQingDan:
+            dlg = UI.TextEntryDialog(self, u"输入要查询的会员号码", u"清单")
+            dlg.ShowModal()
+            self.sizer.Add(QingDan(self, dlg.GetValue()), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         elif _ == Frame.IdTuiChu:
             self.Destroy()
         self.Fit()
