@@ -152,8 +152,8 @@ class JieZhang(UI.Panel):
         staticBoxDX = UI.StaticBox(self, label=u"单项")
         staticBoxSizerDX = UI.StaticBoxSizer(staticBoxDX, UI.VERTICAL)
         _dx = parent.database.Execute("SELECT * FROM DanXiang;")
-        # sizerDX = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber) # FIXME: WX3.0 has a __init__(int, int) overload
-        sizerDX = UI.GridSizer(JieZhang.ColumnNumber, gap=(JieZhang.HorizontalGap, JieZhang.VerticalGap))
+        sizerDX = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber) # FIXME: WX3.0 has a __init__(int, int) overload
+        # sizerDX = UI.GridSizer(JieZhang.ColumnNumber, gap=(JieZhang.HorizontalGap, JieZhang.VerticalGap))
         self.checkbox = []
         for number, name, price in _dx:
             cb = UI.CheckBox(self, label=name)
@@ -190,8 +190,8 @@ class JieZhang(UI.Panel):
         sizerV.Add(self.search, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
         sizerV.Add(self.balance, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
         sizerV.Add(self.pay, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
-        # sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL) # FIXME: WX3.0 has no Add(int,int,proportion=0,flag=0) compatible
-        sizerH.Add(AUTO, AUTO, proportion=AUTO, flag=UI.EXPAND | UI.ALL)
+        sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL) # FIXME: WX3.0 has no Add(int,int,proportion=0,flag=0) compatible
+        # sizerH.Add(AUTO, AUTO, proportion=AUTO, flag=UI.EXPAND | UI.ALL)
         sizerH.Add(sizerV, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
         sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         self.sizer.Add(sizerH, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
@@ -229,16 +229,16 @@ class JieZhang(UI.Panel):
                 UI.MessageBox(u"号码‘{0}’还未注册为会员".format(phonenumber), u"抱歉")
     def OnPay(self, evt):
         if UI.MessageBox(u"客户{user}同意扣款{money}么".format(user=self.keyword, money=self.total), u"警告", style=UI.OK|UI.CANCEL) == UI.OK:
-            print u"扣款", TIMESTAMP()
+            print u"扣款", TIMESTAMP(), self.keyword
             # self.Parent.database.Execute("UPDATE HuiYuan SET ~ WHERE 'PhoneNumber'='{0}';".format(self.keyword))
             # TODO: 需要把Service字段做成“单项（单价）加单项（单价）……·套价，单项（单价）”以应对本次交易后单项或套餐可能的修改否
             # self.Parent.database.Execute("INSERT INTO QingDan VALUES ();")
-            self.OnCancel(None)
             # TODO: 转向清单页签
-            # event = UI.MenuEvent(type=UI.wxEVT_MENU, id=Frame.IdQingDan, menu=self.Parent.bill) # FIXME: how to pass data to event parameter of its handler
-            event = UI.PyCommandEvent(Frame.EventQingDanType, Frame.IdQingDan)
-            event.UserData = self.keyword
+            # event = UI.MenuEvent(type=UI.wxEVT_MENU, id=Frame.IdQingDan, menu=self.Parent.bill) # TODO: why a sensitive keyword parameter named type
+            event = Frame.CustomizedEvent(eventType=Frame.EventQingDanType, id=Frame.IdQingDan)
+            event._SetUserData(self.keyword)
             UI.PostEvent(self.GetParent(), event)
+            self.OnCancel(None) # XXX: 早于自定义事件传递self.keyword值会把self.keyword置为None的
     def OnCheckBox(self, evt):
         cb = evt.GetEventObject()
         _ = cb.UserData.get("Price")
@@ -398,8 +398,8 @@ class TaoCan(UI.Panel):
         for combination, name, price in _:
             data = {"Combination": combination, "Name": name, "Price": price}
             b = UI.Button(self, label=name)
-            # b.SetToolTipString(unicode(price)) # FIXME: WX3.0
-            b.SetToolTip(unicode(price))
+            b.SetToolTipString(unicode(price)) # FIXME: WX3.0
+            # b.SetToolTip(unicode(price))
             b.SetFont(font)
             setattr(b, "UserData", data)
             self.UserDataTC[combination] = data
@@ -442,8 +442,8 @@ class DanXiang(UI.Panel):
             row.append(r)
             i += 1
             b = UI.Button(self, label=name)
-            # b.SetToolTipString(unicode(price)) # FIXME: WX3.0
-            b.SetToolTip(unicode(price))
+            b.SetToolTipString(unicode(price)) # FIXME: WX3.0
+            # b.SetToolTip(unicode(price))
             setattr(b, "UserData", {"Number": number, "Name": name, "Price": price})
             b.SetFont(font)
             self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
@@ -559,6 +559,14 @@ class Frame(UI.Frame):
     IdZuoZhe = UI.NewId()
     EventQingDanType = UI.NewEventType()
     EventQingDanBinder = UI.PyEventBinder(EventQingDanType, UNIQUE)
+    class CustomizedEvent(UI.PyCommandEvent):
+        def __init__(self, *args, **kwargs):
+            UI.PyCommandEvent.__init__(self, eventType=kwargs.get("eventType", UI.wxEVT_NULL), id=kwargs.get("id", 0))
+            self.UserData = kwargs.get("userData")
+        def _SetUserData(self, userData):
+            self.UserData = userData
+        def _GetUserData(self):
+            return self.UserData
     def __init__(self):
         UI.Frame.__init__(self, None, title=u"会员管理")
         self.database = Database()
