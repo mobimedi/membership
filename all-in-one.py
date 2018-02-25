@@ -95,6 +95,9 @@ class Database:
 
 # class TextValidator(UI.PyValidator): # FIXME: WX3.0
 class TextValidator(UI.Validator):
+    KeyArrow = (UI.WXK_UP, UI.WXK_DOWN, UI.WXK_LEFT, UI.WXK_RIGHT)
+    KeyDecimalPoint = (UI.WXK_DECIMAL, UI.WXK_NUMPAD_DECIMAL)
+    KeyNumberInKeypad = (UI.WXK_NUMPAD0, UI.WXK_NUMPAD1, UI.WXK_NUMPAD2, UI.WXK_NUMPAD3, UI.WXK_NUMPAD4, UI.WXK_NUMPAD5, UI.WXK_NUMPAD6, UI.WXK_NUMPAD7, UI.WXK_NUMPAD8, UI.WXK_NUMPAD9)
     def __init__(self, flag):
         # UI.PyValidator.__init__(self)
         UI.Validator.__init__(self)
@@ -107,16 +110,14 @@ class TextValidator(UI.Validator):
     def TransferToWindow(self):
         return True
     def TransferFromWindow(self):
-
         return True
     def OnChar(self, evt):
-        keycode = evt.GetKeyCode()
-        print keycode
+        keycode = evt.GetKeyCode() # TODO: use wxk
         if self.flag is float:
-            if keycode < 256 and chr(keycode) in "+-."+string.digits or keycode in (314, 315, 316, 317, 8):
+            if keycode < 256 and chr(keycode) in "+-."+string.digits or keycode in (314, 315, 316, 317, 8, 13):
                 evt.Skip()
         elif self.flag is int:
-            if keycode < 256 and chr(keycode) in "+-"+string.digits or keycode in (314, 315, 316, 317, 8):
+            if keycode < 256 and chr(keycode) in "+-"+string.digits or keycode in (314, 315, 316, 317, 8, 13):
                 evt.Skip()
 
 class QingDan(UI.Panel):
@@ -152,8 +153,8 @@ class JieZhang(UI.Panel):
         staticBoxDX = UI.StaticBox(self, label=u"单项")
         staticBoxSizerDX = UI.StaticBoxSizer(staticBoxDX, UI.VERTICAL)
         _dx = parent.database.Execute("SELECT * FROM DanXiang;")
-        sizerDX = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber) # FIXME: WX3.0 has a __init__(int, int) overload
-        # sizerDX = UI.GridSizer(JieZhang.ColumnNumber, gap=(JieZhang.HorizontalGap, JieZhang.VerticalGap))
+        # sizerDX = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber) # FIXME: WX3.0 has a __init__(int, int) overload
+        sizerDX = UI.GridSizer(JieZhang.ColumnNumber, gap=(JieZhang.HorizontalGap, JieZhang.VerticalGap))
         self.checkbox = []
         for number, name, price in _dx:
             cb = UI.CheckBox(self, label=name)
@@ -190,8 +191,8 @@ class JieZhang(UI.Panel):
         sizerV.Add(self.search, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
         sizerV.Add(self.balance, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
         sizerV.Add(self.pay, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
-        sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL) # FIXME: WX3.0 has no Add(int,int,proportion=0,flag=0) compatible
-        # sizerH.Add(AUTO, AUTO, proportion=AUTO, flag=UI.EXPAND | UI.ALL)
+        # sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL) # FIXME: WX3.0 has no Add(int,int,proportion=0,flag=0) compatible
+        sizerH.Add(AUTO, AUTO, proportion=AUTO, flag=UI.EXPAND | UI.ALL)
         sizerH.Add(sizerV, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
         sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         self.sizer.Add(sizerH, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
@@ -341,13 +342,13 @@ class Record(UI.Dialog):
         for k, v in data.iteritems():
             st = UI.StaticText(self, label=k, size=(80, 20))
             if isinstance(v, float): # for price etc
-                tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(float)) # TODO: 主键禁止修改
+                tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(float), style=UI.TE_PROCESS_ENTER) # TODO: 主键禁止修改
                 tc.Validate()
             elif isinstance(v, int):
-                tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(int))
+                tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(int), style=UI.TE_PROCESS_ENTER)
                 tc.Validate()
             else:
-                tc = UI.TextCtrl(self, value=v, name=k, size=(120, 20))
+                tc = UI.TextCtrl(self, value=v, name=k, size=(120, 20), style=UI.TE_PROCESS_ENTER)
             sizer = UI.BoxSizer(UI.HORIZONTAL)
             sizer.Add(st, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
             sizer.Add(tc, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
@@ -365,6 +366,11 @@ class Record(UI.Dialog):
         self.DirtyUserData = {}
         cancel.SetFocus()
         self.status = None
+        self.Bind(UI.EVT_TEXT_ENTER, self.OnOK)
+    def OnOK(self, evt):
+        self.status = Record.IdOK
+        self.UserData.update(self.DirtyUserData)
+        self.Destroy()
     def OnButton(self, evt):
         _ = evt.GetId()
         self.status = _
@@ -398,8 +404,8 @@ class TaoCan(UI.Panel):
         for combination, name, price in _:
             data = {"Combination": combination, "Name": name, "Price": price}
             b = UI.Button(self, label=name)
-            b.SetToolTipString(unicode(price)) # FIXME: WX3.0
-            # b.SetToolTip(unicode(price))
+            # b.SetToolTipString(unicode(price)) # FIXME: WX3.0
+            b.SetToolTip(unicode(price))
             b.SetFont(font)
             setattr(b, "UserData", data)
             self.UserDataTC[combination] = data
@@ -442,8 +448,8 @@ class DanXiang(UI.Panel):
             row.append(r)
             i += 1
             b = UI.Button(self, label=name)
-            b.SetToolTipString(unicode(price)) # FIXME: WX3.0
-            # b.SetToolTip(unicode(price))
+            # b.SetToolTipString(unicode(price)) # FIXME: WX3.0
+            b.SetToolTip(unicode(price))
             setattr(b, "UserData", {"Number": number, "Name": name, "Price": price})
             b.SetFont(font)
             self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
