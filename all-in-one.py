@@ -495,12 +495,12 @@ class DanXiang(UI.Panel):
             dlg = Record(self, data.get("Name", u"缺失异常"), data)
             dlg.ShowModal()
             # TODO: 参与套餐的单项禁止删改
-            if dlg.status == Record.IdOK:
+            if dlg.status == Record.IdOK: # FIXME: 若单价有修改还须更新提示
                 __.SetLabel(data.get("Name", u"缺失异常"))
                 # FIXME: 按钮标注文字加长窗口不能自适应（需手动触发）
                 self.PostSizeEventToParent()
                 self.Parent.database.Execute(u"UPDATE DanXiang SET Name='{Name}', Price={Price} WHERE Number='{Number}';".format(**data))
-            elif dlg.status == Record.IdRemove:
+            elif dlg.status == Record.IdRemove: # FIXME: 删除一个元素后出发重新布局（否则可能引发添加时该位置已经有元素的问题）
                 # self.sizer.Remove(__) # FIXME: why does not work
                 __.Destroy()
                 self.sizer.Layout()
@@ -641,7 +641,7 @@ class Frame(UI.Frame):
         self.Bind(Frame.EventQingDanBinder, self.OnMenu)
     def OnMenu(self, evt):
         _ = evt.GetId()
-        if _ == self.status and _ is not Frame.IdDengRu:
+        if _ == self.status and _ is not Frame.IdDengRu: # TODO: 激活、作者、清单、导入、导出、升级等弹框菜单允许响应连续点击
             return None
         self.sb.SetStatusText(self.mb.FindItemById(_).GetText())
         self.sizer.Clear(True)
