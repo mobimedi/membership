@@ -58,6 +58,7 @@ class Database:
             u"INSERT INTO DanXiang VALUES ('J', '剪一', 19.00);",
             u"INSERT INTO DanXiang VALUES ('K', '剪二', 20.00);",
 
+            u"INSERT INTO TaoCan VALUES ('Z', '无', 0.00);",
             u"INSERT INTO TaoCan VALUES ('X+Y', '吹一加染一', 55.55);",
             u"INSERT INTO TaoCan VALUES ('Y+Z+D', '染一加洗二加吹二', 99.99);",
             u"INSERT INTO TaoCan VALUES ('G+H+J', '烫三加垃一加剪一', 29.90);",
@@ -74,7 +75,7 @@ class Database:
             self.Execute(_)
     def Clear(self):pass
     def Execute(self, sql): # TODO: make many
-        print "[SQL]", sql
+        # print "[SQL]", sql
         assert isinstance(sql, basestring)
         cursor = Database.CONNECT.cursor()
         cursor.execute(sql)
@@ -184,7 +185,7 @@ class JieZhang(UI.Panel):
         sizerH = UI.BoxSizer(UI.HORIZONTAL)
         sizerV = UI.BoxSizer(UI.VERTICAL)
         self.due = UI.StaticText(self, id=JieZhang.IdDue, label=u"应付：0.00")
-        self.search = UI.SearchCtrl(self, id=JieZhang.IdSearch, style=UI.TE_PROCESS_ENTER)
+        self.search = UI.SearchCtrl(self, id=JieZhang.IdSearch, style=UI.TE_PROCESS_ENTER) # FIXME: 禁止输入SQL敏感字符
         self.balance = UI.StaticText(self, id=JieZhang.IdBalance, label=u"姓名：余额")
         self.pay = UI.Button(self, id=JieZhang.IdPay, label=u"支付")
         sizerV.Add(self.due, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
@@ -205,8 +206,11 @@ class JieZhang(UI.Panel):
         self.pay.Bind(UI.EVT_BUTTON, self.OnPay)
         self.keyword = None
         self.dx = 0.00
+        self.dxItem = []
         self.tc = 0.00
+        self.tcItem = None
         self.yh = 1.00
+        self.yhItem = None
         self.total = 0.00
         self.Bind(UI.EVT_CHECKBOX, self.OnCheckBox)
         radioBoxTC.Bind(UI.EVT_RADIOBOX, self.OnRadioBoxTC)
@@ -230,10 +234,19 @@ class JieZhang(UI.Panel):
                 UI.MessageBox(u"号码‘{0}’还未注册为会员".format(phonenumber), u"抱歉")
     def OnPay(self, evt):
         if UI.MessageBox(u"客户{user}同意扣款{money}么".format(user=self.keyword, money=self.total), u"警告", style=UI.OK|UI.CANCEL) == UI.OK:
-            print u"扣款", TIMESTAMP(), self.keyword
-            # self.Parent.database.Execute("UPDATE HuiYuan SET ~ WHERE 'PhoneNumber'='{0}';".format(self.keyword))
+            # print u"扣款", TIMESTAMP()
+            _ = self.Parent.database.Execute("SELECT Balance FROM HuiYuan WHERE PhoneNumber='{0}'".format(self.keyword))[0][0]
+            if self.total > _:
+                UI.MessageBox(u"余额不足请充值", u"天呐")
+                return None
+            self.Parent.database.Execute("UPDATE HuiYuan SET Balance={balance} WHERE PhoneNumber='{0}';".format(self.keyword, balance=_ - self.total))
             # TODO: 需要把Service字段做成“单项（单价）加单项（单价）……·套价，单项（单价）”以应对本次交易后单项或套餐可能的修改否
-            # self.Parent.database.Execute("INSERT INTO QingDan VALUES ();")
+            service = []
+            if self.tcItem is not None:
+                service.append(self.tcItem)
+            service.extend(self.dxItem)
+            self.Parent.database.Execute(u"INSERT INTO QingDan VALUES ('{phonenumber}', '{service}', '{discount}', {fee}, {balance}, '{timestamp}');"
+                                         .format(phonenumber=self.keyword, service=u"，".join(service), discount=self.yhItem, fee=self.total, balance=_ - self.total, timestamp=TIMESTAMP()))
             # TODO: 转向清单页签
             # event = UI.MenuEvent(type=UI.wxEVT_MENU, id=Frame.IdQingDan, menu=self.Parent.bill) # TODO: why a sensitive keyword parameter named type
             event = Frame.CustomizedEvent(eventType=Frame.EventQingDanType, id=Frame.IdQingDan)
@@ -243,22 +256,29 @@ class JieZhang(UI.Panel):
     def OnCheckBox(self, evt):
         cb = evt.GetEventObject()
         _ = cb.UserData.get("Price")
+        __ = cb.UserData.get("Name")
         if cb.IsChecked():
             self.dx += _
+            self.dxItem.append(__)
         else:
             self.dx -= _
+            self.dxItem.pop(self.dxItem.index(__))
         self.UpdateTotal()
     def OnRadioBoxTC(self, evt):
         rb = evt.GetEventObject()
         name = evt.GetString()
         _ = rb.UserData.get(name).get("Price")
+        __ = rb.UserData.get(name).get("Name")
         self.tc = _
+        self.tcItem = __
         self.UpdateTotal()
     def OnRadioBoxYH(self, evt):
         rb = evt.GetEventObject()
         name = evt.GetString()
         _ = rb.UserData.get(name).get("Factor")
+        __ = rb.UserData.get(name).get("Activity")
         self.yh = _
+        self.yhItem = __
         self.UpdateTotal()
     def UpdateTotal(self):
         self.total = (self.dx + self.tc) * self.yh
@@ -418,17 +438,17 @@ class TaoCan(UI.Panel):
         self.Bind(UI.EVT_BUTTON, self.OnButton)
     def OnButton(self, evt):
         _ = evt.GetId()
-        if _ == TaoCan.IdGenerate:
-            print u"新增"
-        else:
-            __ = self.FindWindowById(_)
-            data = __.UserData
-            dlg = Record(self, data.get("Name", u"缺失异常"), data)
-            dlg.ShowModal()
-            if dlg.status == Record.IdRemove:
-                print u"删除"
-            elif dlg.status == Record.IdOK:
-                print u"修改"
+        # if _ == TaoCan.IdGenerate:
+        #     print u"新增"
+        # else:
+        #     __ = self.FindWindowById(_)
+        #     data = __.UserData
+        #     dlg = Record(self, data.get("Name", u"缺失异常"), data)
+        #     dlg.ShowModal()
+        #     if dlg.status == Record.IdRemove:
+        #         print u"删除"
+        #     elif dlg.status == Record.IdOK:
+        #         print u"修改"
 
 class DanXiang(UI.Panel):
     ColumnNumber = 5
@@ -471,7 +491,7 @@ class DanXiang(UI.Panel):
     def OnButton(self, evt):
         _ = evt.GetId()
         __ = self.FindWindowById(_)
-        if _ == DanXiang.IdPlus:
+        if _ == DanXiang.IdPlus: # TODO: 禁止编号和名称重复
             here = self.sizer.GetItemCount()
             data = {"Number": "?", "Name": "?", "Price": 0.0}
             dlg = Record(self, u"添加", data)
@@ -649,7 +669,10 @@ class Frame(UI.Frame):
         _ = evt.GetId()
         if _ == self.status and _ is not Frame.IdDengRu: # TODO: 激活、作者、清单、导入、导出、升级等弹框菜单允许响应连续点击
             return None
-        self.sb.SetStatusText(self.mb.FindItemById(_).GetText())
+        __ = self.mb.FindItemById(_)
+        if __ is None:
+            return None
+        self.sb.SetStatusText(__.GetText())
         self.sizer.Clear(True)
         if _ == Frame.IdDengRu:
             InOut.User = None
