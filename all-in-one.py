@@ -75,7 +75,7 @@ class Database:
             self.Execute(_)
     def Clear(self):pass
     def Execute(self, sql): # TODO: make many
-        # print "[SQL]", sql
+        print "[SQL]", sql
         assert isinstance(sql, basestring)
         cursor = Database.CONNECT.cursor()
         cursor.execute(sql)
@@ -94,32 +94,42 @@ class Database:
         self.Execute("INSERT INTO DanXiang VALUES ('H', 'What', 22.22);")
         print self.Execute("SELECT * FROM DanXiang;")
 
-# class TextValidator(UI.PyValidator): # FIXME: WX3.0
-class TextValidator(UI.Validator):
+# XXX: quirk of wx(WX3.0 at least)
+# Must be a subclass of PyValidator will call TransferToWindow automatically
+# Must be close by builtin OK button will call TransferFromWindow automatically
+
+class TextValidator(UI.PyValidator): # FIXME: WX3.0
+# class TextValidator(UI.Validator):
     KeyArrow = (UI.WXK_UP, UI.WXK_DOWN, UI.WXK_LEFT, UI.WXK_RIGHT)
     KeyDecimalPoint = (UI.WXK_DECIMAL, UI.WXK_NUMPAD_DECIMAL)
     KeyNumberInKeypad = (UI.WXK_NUMPAD0, UI.WXK_NUMPAD1, UI.WXK_NUMPAD2, UI.WXK_NUMPAD3, UI.WXK_NUMPAD4, UI.WXK_NUMPAD5, UI.WXK_NUMPAD6, UI.WXK_NUMPAD7, UI.WXK_NUMPAD8, UI.WXK_NUMPAD9)
-    def __init__(self, flag):
-        # UI.PyValidator.__init__(self)
-        UI.Validator.__init__(self)
-        self.flag = flag
+    def __init__(self, f, k, data):
+        UI.PyValidator.__init__(self)
+        # UI.Validator.__init__(self)
+        self.f = f
+        self.k = k
+        self.data = data
         self.Bind(UI.EVT_CHAR, self.OnChar)
     def Clone(self):
-        return TextValidator(self.flag)
-    def Validate(self, w):
+        return TextValidator(self.f, self.k, self.data)
+    def Validate(self, parent):
         return True
     def TransferToWindow(self):
+        self.GetWindow().SetValue(unicode(self.data.get(self.k))) # TODO: 无论何种类型展示到窗体一律文本
         return True
     def TransferFromWindow(self):
+        self.data[self.k] = self.f(self.GetWindow().GetValue())
         return True
     def OnChar(self, evt):
         keycode = evt.GetKeyCode() # TODO: use wxk
-        if self.flag is float:
-            if keycode < 256 and chr(keycode) in "+-."+string.digits or keycode in (314, 315, 316, 317, 8, 13):
+        if self.f is float:
+            if keycode < 256 and chr(keycode) in "+-."+string.digits or keycode in (314, 315, 316, 317, 8, 13, 127):
                 evt.Skip()
-        elif self.flag is int:
-            if keycode < 256 and chr(keycode) in "+-"+string.digits or keycode in (314, 315, 316, 317, 8, 13):
+        elif self.f is int:
+            if keycode < 256 and chr(keycode) in "+-"+string.digits or keycode in (314, 315, 316, 317, 8, 13, 127):
                 evt.Skip()
+        else:
+            evt.Skip()
 
 class QingDan(UI.Panel):
     def __init__(self, parent, who=None):
@@ -319,7 +329,11 @@ class HuiYuan(UI.Panel):
         data = {}
         for i, k in enumerate(self.title):
             data[k] = _.GetValue(r, i)
-        dlg = Record(self, u"", data)
+        # XXX: PATCH START
+        data["Balance"] = float(data.get("Balance"))
+        data["Credit"] = int(data.get("Credit"))
+        # XXX: PATH END
+        dlg = Record(self, u"信息", data)
         dlg.ShowModal()
         if dlg.status == Record.IdRemove:
             UI.MessageBox(u"删除会员需要激活", u"可惜")
@@ -337,9 +351,11 @@ class HuiYuan(UI.Panel):
             else:
                 for i, x in enumerate(self.title):
                     _.SetValue(data.get(x), r, i)
+                # XXX: PATCH START
                 data["Balance"] = float(data.get("Balance"))
                 data["Credit"] = int(data.get("Credit"))
                 phonenumber = data.pop("PhoneNumber")
+                # XXX: PATCH END
                 accusative = u", ".join(["=".join((k, `v`)) if not isinstance(v, unicode) else "%s='%s'" % (k, v) for k, v in data.iteritems()])
                 self.Parent.database.Execute("UPDATE HuiYuan SET %s WHERE PhoneNumber='{0}';".format(phonenumber) % accusative)
     # def OnButton(self, evt):
@@ -352,8 +368,8 @@ class HuiYuan(UI.Panel):
     #         print u"修改"
 
 class Record(UI.Dialog):
-    IdOK = UI.NewId()
-    IdCancel = UI.NewId()
+    IdOK = UI.ID_OK
+    IdCancel = UI.ID_CANCEL
     IdRemove = UI.NewId()
     def __init__(self, parent, title, data):
         UI.Dialog.__init__(self, parent, title=title)
@@ -362,13 +378,13 @@ class Record(UI.Dialog):
         for k, v in data.iteritems():
             st = UI.StaticText(self, label=k, size=(80, 20))
             if isinstance(v, float): # for price etc
-                tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(float), style=UI.TE_PROCESS_ENTER) # TODO: 主键禁止修改
+                tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(float, k, data), style=UI.TE_PROCESS_ENTER) # TODO: 主键禁止修改
                 tc.Validate()
             elif isinstance(v, int):
-                tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(int), style=UI.TE_PROCESS_ENTER)
+                tc = UI.TextCtrl(self, value=unicode(v), name=k, size=(120, 20), validator=TextValidator(int, k, data), style=UI.TE_PROCESS_ENTER)
                 tc.Validate()
             else:
-                tc = UI.TextCtrl(self, value=v, name=k, size=(120, 20), style=UI.TE_PROCESS_ENTER)
+                tc = UI.TextCtrl(self, value=v, name=k, size=(120, 20), validator=TextValidator(unicode, k, data), style=UI.TE_PROCESS_ENTER)
             sizer = UI.BoxSizer(UI.HORIZONTAL)
             sizer.Add(st, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
             sizer.Add(tc, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
@@ -381,25 +397,29 @@ class Record(UI.Dialog):
         self.sizer.Add(remove, proportion=FIXED, flag=UI.EXPAND | UI.ALL)
         self.SetSizerAndFit(self.sizer)
         self.Bind(UI.EVT_BUTTON, self.OnButton)
-        self.Bind(UI.EVT_TEXT, self.OnText)
+        # self.Bind(UI.EVT_TEXT, self.OnText)
         self.UserData = data
-        self.DirtyUserData = {}
+        # self.DirtyUserData = {}
         cancel.SetFocus()
         self.status = None
         self.Bind(UI.EVT_TEXT_ENTER, self.OnOK)
     def OnOK(self, evt):
         self.status = Record.IdOK
-        self.UserData.update(self.DirtyUserData)
-        self.Destroy()
+        # self.UserData.update(self.DirtyUserData)
+        # self.Destroy()
+        self.ProcessEvent(UI.PyCommandEvent(UI.wxEVT_COMMAND_BUTTON_CLICKED, self.status))
     def OnButton(self, evt):
         _ = evt.GetId()
         self.status = _
-        if _ == Record.IdOK:
-            self.UserData.update(self.DirtyUserData)
-        self.Destroy()
-    def OnText(self, evt):
-        _ = self.FindWindowById(evt.GetId())
-        self.DirtyUserData[_.GetName()] = _.GetValue() # FIXME: need format price to float
+        # if _ == Record.IdOK:
+        #     self.UserData.update(self.DirtyUserData)
+        if _ == Record.IdRemove:
+            self.Destroy()
+        else:
+            evt.Skip()
+    # def OnText(self, evt):
+    #     _ = self.FindWindowById(evt.GetId())
+    #     self.DirtyUserData[_.GetName()] = _.GetValue()
 
 class TaoCan(UI.Panel):
     IdGenerate = UI.NewId()
@@ -665,12 +685,12 @@ class Frame(UI.Frame):
         self.sizer.SetMinSize((620, 400))
         self.SetSizer(self.sizer)
         self.Bind(Frame.EventQingDanBinder, self.OnMenu)
-    def OnMenu(self, evt):
+    def OnMenu(self, evt): # 登入、激活、作者、清单、导入、导出、升级等弹框菜单允许响应连续点击
         _ = evt.GetId()
-        if _ == self.status and _ is not Frame.IdDengRu: # TODO: 激活、作者、清单、导入、导出、升级等弹框菜单允许响应连续点击
+        if _ == self.status and _ not in (Frame.IdDengRu, Frame.IdJiHuo, Frame.IdZuoZhe, Frame.IdQingDan, Frame.IdDaoRu, Frame.IdDaoChu, Frame.IdShengJi):
             return None
         __ = self.mb.FindItemById(_)
-        if __ is None:
+        if __ is None: # TODO: 尚未复现（在结账页签输入号码然后选择单项接着敲Enter键居然触发菜单动作）
             return None
         self.sb.SetStatusText(__.GetText())
         self.sizer.Clear(True)
@@ -691,7 +711,7 @@ class Frame(UI.Frame):
             self.sizer.Add(HuiYuan(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         elif _ == Frame.IdJieZhang and self.status != Frame.IdJieZhang:
             self.sizer.Add(JieZhang(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
-        elif _ == Frame.IdQingDan and self.status != Frame.IdQingDan:
+        elif _ == Frame.IdQingDan:
             # if isinstance(evt, UI.MenuEvent):
             if hasattr(evt, "UserData"):
                 self.sizer.Add(QingDan(self, evt.UserData), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
