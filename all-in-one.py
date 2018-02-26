@@ -146,7 +146,7 @@ class JieZhang(UI.Panel):
     IdSearch = UI.NewId()
     IdBalance = UI.NewId()
     IdPay = UI.NewId()
-    MajorDimension = 11
+    MajorDimension = 5
     def __init__(self, parent):
         UI.Panel.__init__(self, parent)
         self.sizer = UI.BoxSizer(UI.VERTICAL)
@@ -431,11 +431,13 @@ class TaoCan(UI.Panel):
                 print u"修改"
 
 class DanXiang(UI.Panel):
-    ColumnNumber = 11
+    ColumnNumber = 5
     IdPlus = UI.NewId()
+    HorizontalGap = 5
+    VerticalGap = 5
     def __init__(self, parent):
         UI.Panel.__init__(self, parent)
-        self.sizer = UI.GridBagSizer(5, 5) # FIXME: GridBagSizer -> GridSizer
+        self.sizer = UI.GridBagSizer(DanXiang.VerticalGap, DanXiang.HorizontalGap) # FIXME: GridBagSizer -> GridSizer
         i = c = r = 0
         _ = parent.database.Execute("SELECT * FROM DanXiang;")
         column = []
@@ -495,7 +497,7 @@ class DanXiang(UI.Panel):
             dlg = Record(self, data.get("Name", u"缺失异常"), data)
             dlg.ShowModal()
             # TODO: 参与套餐的单项禁止删改
-            if dlg.status == Record.IdOK: # FIXME: 若单价有修改还须更新提示
+            if dlg.status == Record.IdOK:
                 __.SetLabel(data.get("Name", u"缺失异常"))
                 __.SetToolTipString(unicode(data.get("Price", u"缺失异常")))  # FIXME: WX3.0
                 # __.SetToolTip(unicode(data.get("Price", u"缺失异常")))
