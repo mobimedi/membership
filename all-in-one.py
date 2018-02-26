@@ -153,8 +153,8 @@ class JieZhang(UI.Panel):
         staticBoxDX = UI.StaticBox(self, label=u"单项")
         staticBoxSizerDX = UI.StaticBoxSizer(staticBoxDX, UI.VERTICAL)
         _dx = parent.database.Execute("SELECT * FROM DanXiang;")
-        # sizerDX = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber) # FIXME: WX3.0 has a __init__(int, int) overload
-        sizerDX = UI.GridSizer(JieZhang.ColumnNumber, gap=(JieZhang.HorizontalGap, JieZhang.VerticalGap))
+        sizerDX = UI.GridSizer(JieZhang.RowNumber, JieZhang.ColumnNumber) # FIXME: WX3.0 has a __init__(int, int) overload
+        # sizerDX = UI.GridSizer(JieZhang.ColumnNumber, gap=(JieZhang.HorizontalGap, JieZhang.VerticalGap))
         self.checkbox = []
         for number, name, price in _dx:
             cb = UI.CheckBox(self, label=name)
@@ -191,8 +191,8 @@ class JieZhang(UI.Panel):
         sizerV.Add(self.search, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
         sizerV.Add(self.balance, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
         sizerV.Add(self.pay, proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
-        # sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL) # FIXME: WX3.0 has no Add(int,int,proportion=0,flag=0) compatible
-        sizerH.Add(AUTO, AUTO, proportion=AUTO, flag=UI.EXPAND | UI.ALL)
+        sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL) # FIXME: WX3.0 has no Add(int,int,proportion=0,flag=0) compatible
+        # sizerH.Add(AUTO, AUTO, proportion=AUTO, flag=UI.EXPAND | UI.ALL)
         sizerH.Add(sizerV, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
         sizerH.Add((AUTO, AUTO), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         self.sizer.Add(sizerH, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
@@ -404,8 +404,8 @@ class TaoCan(UI.Panel):
         for combination, name, price in _:
             data = {"Combination": combination, "Name": name, "Price": price}
             b = UI.Button(self, label=name)
-            # b.SetToolTipString(unicode(price)) # FIXME: WX3.0
-            b.SetToolTip(unicode(price))
+            b.SetToolTipString(unicode(price)) # FIXME: WX3.0
+            # b.SetToolTip(unicode(price))
             b.SetFont(font)
             setattr(b, "UserData", data)
             self.UserDataTC[combination] = data
@@ -448,8 +448,8 @@ class DanXiang(UI.Panel):
             row.append(r)
             i += 1
             b = UI.Button(self, label=name)
-            # b.SetToolTipString(unicode(price)) # FIXME: WX3.0
-            b.SetToolTip(unicode(price))
+            b.SetToolTipString(unicode(price)) # FIXME: WX3.0
+            # b.SetToolTip(unicode(price))
             setattr(b, "UserData", {"Number": number, "Name": name, "Price": price})
             b.SetFont(font)
             self.sizer.Add(b, pos=(r, c), flag=UI.EXPAND|UI.ALL)
@@ -497,6 +497,8 @@ class DanXiang(UI.Panel):
             # TODO: 参与套餐的单项禁止删改
             if dlg.status == Record.IdOK: # FIXME: 若单价有修改还须更新提示
                 __.SetLabel(data.get("Name", u"缺失异常"))
+                __.SetToolTipString(unicode(data.get("Price", u"缺失异常")))  # FIXME: WX3.0
+                # __.SetToolTip(unicode(data.get("Price", u"缺失异常")))
                 # FIXME: 按钮标注文字加长窗口不能自适应（需手动触发）
                 self.PostSizeEventToParent()
                 self.Parent.database.Execute(u"UPDATE DanXiang SET Name='{Name}', Price={Price} WHERE Number='{Number}';".format(**data))
