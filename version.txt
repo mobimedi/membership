@@ -32,7 +32,7 @@ VSVersionInfo(
         [StringStruct(u'FileDescription', u'会员管理'),
         StringStruct(u'FileVersion', u'0.0.0.1'),
         StringStruct(u'InternalName', u'membershipaio'),
-        StringStruct(u'LegalCopyright', u'NaGeXiuCai.COM All rights reserved.'),
+        StringStruct(u'LegalCopyright', u'NaGeXiuCai.COM All Rights Reserved'),
         StringStruct(u'OriginalFilename', u'membershipaio.exe'),
         StringStruct(u'ProductName', u'MembershipAIO Application'),
         StringStruct(u'ProductVersion', u'0.0.0.1')])
