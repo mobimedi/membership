@@ -75,7 +75,7 @@ class Database:
             self.Execute(_)
     def Clear(self):pass
     def Execute(self, sql): # TODO: make many
-        print "[SQL]", sql
+        # print "[SQL]", sql
         assert isinstance(sql, basestring)
         cursor = Database.CONNECT.cursor()
         cursor.execute(sql)
@@ -142,7 +142,7 @@ class QingDan(UI.Panel):
         self.dvlc.AppendTextColumn("Fee", width=90)
         self.dvlc.AppendTextColumn("Balance", width=90)
         self.dvlc.AppendTextColumn("Timestamp", width=160)
-        _ = parent.database.Execute("SELECT * FROM QingDan WHERE PhoneNumber='{0}';".format(who))
+        _ = parent.database.Execute("SELECT * FROM QingDan WHERE PhoneNumber='{0}' ORDER BY Timestamp DESC;".format(who))
         for phonenumber, service, discount, fee, balance, timestamp in _:
             self.dvlc.AppendItem((phonenumber, service, discount, unicode(fee), unicode(balance), timestamp))
         self.sizer.Add(self.dvlc, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
@@ -307,7 +307,7 @@ class HuiYuan(UI.Panel):
         self.dvlc.AppendTextColumn("Name", width=180)
         self.dvlc.AppendTextColumn("Balance", width=90)
         self.dvlc.AppendTextColumn("Credit", width=70)
-        _ = parent.database.Execute("SELECT * FROM HuiYuan;")
+        _ = parent.database.Execute("SELECT * FROM HuiYuan ORDER BY PhoneNumber;")
         for phonenumber, name, balance, credit in _:
             self.dvlc.AppendItem((phonenumber, name, unicode(balance), unicode(credit)))
         self.sizer.Add(self.dvlc, proportion=AUTO, flag=UI.EXPAND|UI.ALL)
@@ -340,7 +340,11 @@ class HuiYuan(UI.Panel):
             # self.Parent.database.Execute("DELETE FROM HuiYuan WHERE PhoneNumber='{0}';".format(data.get("PhoneNumber")))
             # _.DeleteItem(r)
         elif dlg.status == Record.IdOK:
-            if data.get("PhoneNumber") != _.GetValue(r, 0): # TODO: 如果主键被修改认为是新增
+            phonenumber = data.get("PhoneNumber")
+            if phonenumber != _.GetValue(r, 0): # TODO: 如果主键被修改认为是新增
+                if self.Parent.database.Execute("SELECT * FROM HuiYuan WHERE PhoneNumber='{0}';".format(phonenumber)):
+                    UI.MessageBox(u"号码重复请更新已注册的", u"注意")
+                    return None
                 record = []
                 for x in self.title:
                     xx = data.get(x)
