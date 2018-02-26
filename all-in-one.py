@@ -504,10 +504,12 @@ class DanXiang(UI.Panel):
                 # FIXME: 按钮标注文字加长窗口不能自适应（需手动触发）
                 self.PostSizeEventToParent()
                 self.Parent.database.Execute(u"UPDATE DanXiang SET Name='{Name}', Price={Price} WHERE Number='{Number}';".format(**data))
-            elif dlg.status == Record.IdRemove: # FIXME: 删除一个元素后出发重新布局（否则可能引发添加时该位置已经有元素的问题）
+            elif dlg.status == Record.IdRemove:
                 # self.sizer.Remove(__) # FIXME: why does not work
-                __.Destroy()
-                self.sizer.Layout()
+                # self.sizer.Detach(__)
+                # __.Destroy()
+                # self.sizer.Layout()
+                __.Disable() # TODO: 由于剔除一个元素后不能自适应布局导致有个空位进而引起新增元素时越界问题的临时方案
                 self.Parent.database.Execute(u"DELETE FROM DanXiang WHERE Number='{Number}';".format(**data))
 
 class InOut(UI.Dialog):
