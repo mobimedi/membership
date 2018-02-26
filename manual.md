@@ -49,6 +49,8 @@
 
 可以看到全部的单项服务列表。
 
+![][30]
+
 **鼠标移动到某个单项上略等片刻会有单价提示**。
 
 单击任意一个单项服务，可以修改该单项服务的信息：价格、名称。
@@ -57,13 +59,13 @@
 
 **名称不能重复**。
 
-![][30]
+![][31]
 
 可以通过“+”单项服务新增一个单项服务。
 
 **新增的单项服务编号和名称均不能和已存在的单项服务相同**。
 
-![][31]
+![][32]
 
 ### 结账
 
@@ -143,8 +145,9 @@
 [6]: ./picture/about.png
 [20]: ./picture/manage-membership.png
 [21]: ./picture/manage-membership-information.png
-[30]: ./picture/service-dx-information.png
-[31]: ./picture/service-dx-new.png
+[30]: ./picture/service-dx.png
+[31]: ./picture/service-dx-information.png
+[32]: ./picture/service-dx-new.png
 [40]: ./picture/bill-pay.png
 [41]: ./picture/bill-pay-sample.png
 [42]: ./picture/bill-pay-confirm-sample.png
