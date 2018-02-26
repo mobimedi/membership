@@ -433,6 +433,7 @@ class TaoCan(UI.Panel):
         self.sizerLeft = UI.BoxSizer(UI.VERTICAL)
         self.sizerRight = UI.BoxSizer(UI.VERTICAL)
         b = UI.Button(self, id=TaoCan.IdGenerate, label=u"生成")
+        b.Disable() #
         _ = parent.database.Execute("SELECT * FROM DanXiang;")
         __ = []
         self.UserDataDX = {}
@@ -515,13 +516,17 @@ class DanXiang(UI.Panel):
     def OnButton(self, evt):
         _ = evt.GetId()
         __ = self.FindWindowById(_)
-        if _ == DanXiang.IdPlus: # TODO: 禁止编号和名称重复
+        if _ == DanXiang.IdPlus:
             here = self.sizer.GetItemCount()
             data = {"Number": "?", "Name": "?", "Price": 0.0}
             dlg = Record(self, u"添加", data)
             dlg.ShowModal()
             # TODO: 去重（也可以放在Validator中做）
             if dlg.status == Record.IdOK:
+                if self.Parent.database.Execute(u"SELECT * FROM DanXiang WHERE Number='{number}' OR Name='{name}';"
+                                                .format(number=data.get("Number"), name=data.get("Name"))):
+                    UI.MessageBox(u"编号或名称重复", u"注意")
+                    return None
                 b = UI.Button(self, label=data.get("Name", u"缺失异常"))
                 b.SetFont(__.GetFont())
                 setattr(b, "UserData", data)
@@ -538,10 +543,31 @@ class DanXiang(UI.Panel):
                 self.Parent.database.Execute(u"INSERT INTO DanXiang VALUES ('{Number}', '{Name}', {Price});".format(**data))
         else:
             data = __.UserData
+            _number = data.get("Number")
+            _name = data.get("Name")
+            _price = data.get("Price")
             dlg = Record(self, data.get("Name", u"缺失异常"), data)
             dlg.ShowModal()
             # TODO: 参与套餐的单项禁止删改
             if dlg.status == Record.IdOK:
+                if _number == data.get("Number") and _name == data.get("Name") and _price == data.get("Price"):
+                    return None
+                if _number != data.get("Number"): # FIXME: 禁止修改单项编号
+                    UI.MessageBox(u"单项编号禁止变更（请删除后或直接新增单项）", u"抱歉")
+                    data["Number"] = _number
+                    data["Name"] = _name
+                    return None
+                    # if self.Parent.database.Execute(u"SELECT * FROM TaoCan WHERE Combination LIKE '%{0}%';".format(_number)):
+                    #     UI.MessageBox(u"该单项存在绑定的套餐", u"注意")
+                    #     data["Number"] = _number
+                    #     return None
+                if _name != data.get("Name"): # FIXME: 单项名称在套餐名称是否存在绑定关系有待检查（涉及复杂场景：有套餐‘吹一加染一’恰好有单项‘加染’）
+                    if self.Parent.database.Execute(u"SELECT * FROM DanXiang WHERE Name='{name}';"
+                                                    .format(name=data.get("Name"))):
+                        UI.MessageBox(u"名称重复", u"注意")
+                        data["Number"] = _number
+                        data["Name"] = _name
+                        return None
                 __.SetLabel(data.get("Name", u"缺失异常"))
                 __.SetToolTipString(unicode(data.get("Price", u"缺失异常")))  # FIXME: WX3.0
                 # __.SetToolTip(unicode(data.get("Price", u"缺失异常")))
