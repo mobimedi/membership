@@ -11,7 +11,9 @@ import os
 import sys
 import string
 import datetime
+import wmi
 
+DBFILE = "./aio.dll"
 TIMESTAMP = lambda: datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 UNIQUE = 1
@@ -22,13 +24,13 @@ class Database:
     CONNECT = None
     def __init__(self):
         if Database.CONNECT is None:
-            Database.CONNECT = DB.connect(":memory:")
+            Database.CONNECT = DB.connect(DBFILE)
     def __del__(self):
         if Database.CONNECT is not None:
             Database.CONNECT.close()
     def Initialize(self):
         CREATE = (
-            "CREATE TABLE GuanLi (ZunXingDaMing TEXT, DaSiDouBuShuo TEXT);",
+            "CREATE TABLE GuanLi (ZunXingDaMing TEXT, DaSiDouBuShuo TEXT, ExpiredDate TEXT, Power TEXT, PhoneNumber TEXT, Signboard TEXT, Address TEXT, SN TEXT);",
 
             "CREATE TABLE HuiYuan (PhoneNumber TEXT, Name TEXT, Balance FLOAT, Credit INT);",
             "CREATE TABLE DanXiang (Number TEXT, Name TEXT, Price FLOAT);",
@@ -36,8 +38,9 @@ class Database:
             "CREATE TABLE YouHui (Number TEXT, Activity TEXT, Factor FLOAT);",
             "CREATE TABLE QingDan (PhoneNumber TEXT, Service TEXT, Discount TEXT, Fee FLOAT, Balance FLOAT, Timestamp TEXT);"
         )
+        expiredDate = (datetime.datetime.now() + datetime.timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
         INSERT = (
-            u"INSERT INTO GuanLi VALUES ('Administrator', 'nagexiucai.com');",
+            u"INSERT INTO GuanLi VALUES ('nagexiucai.com', 'nagexiucai.com', '{0}', 'ALL', 'nagexiucai.com', 'nagexiucai.com', 'nagexiucai.com', 'IGNORED');".format(expiredDate),
 
             u"INSERT INTO HuiYuan VALUES ('086182029*****', '那个秀才', 33.33, 0);",
             u"INSERT INTO HuiYuan VALUES ('086182918*****', '大海', 77.77, 0);",
@@ -130,6 +133,65 @@ class TextValidator(UI.PyValidator): # FIXME: WX3.0
                 evt.Skip()
         else:
             evt.Skip()
+
+class JiHuo(UI.Dialog):
+    IdOK = UI.NewId()
+    def __init__(self, parent, title, data):
+        UI.Dialog.__init__(self, parent)
+        self.UserData = data
+        self.status = None
+        sizerV = UI.BoxSizer(UI.VERTICAL)
+        sizerH = UI.BoxSizer(UI.HORIZONTAL)
+        sizerH.Add(UI.StaticText(self, label=u"尊姓大名"), proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerH.Add(UI.TextCtrl(self, name="ZunXingDaMing", size=(160, 20)), proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerV.Add(sizerH, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        sizerH = UI.BoxSizer(UI.HORIZONTAL)
+        sizerH.Add(UI.StaticText(self, label=u"账户密码"), proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerH.Add(UI.TextCtrl(self, name="DaSiDouBuShuo", size=(160, 20)), proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerV.Add(sizerH, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        sizerH = UI.BoxSizer(UI.HORIZONTAL)
+        sizerH.Add(UI.StaticText(self, label=u"手机号码"), proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerH.Add(UI.TextCtrl(self, name="PhoneNumber", size=(160, 20)), proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerV.Add(sizerH, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        sizerH = UI.BoxSizer(UI.HORIZONTAL)
+        sizerH.Add(UI.StaticText(self, label=u"招牌字号"), proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerH.Add(UI.TextCtrl(self, name="Signboard", size=(160, 20)), proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerV.Add(sizerH, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        sizerH = UI.BoxSizer(UI.HORIZONTAL)
+        sizerH.Add(UI.StaticText(self, label=u"贵店地址"), proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerH.Add(UI.TextCtrl(self, name="Address", size=(160, 20)), proportion=FIXED, flag=UI.EXPAND|UI.LEFT|UI.RIGHT)
+        sizerV.Add(sizerH, proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        sizerV.Add(UI.Button(self, id=JiHuo.IdOK, label=u"确认"), proportion=FIXED, flag=UI.EXPAND|UI.ALL)
+        self.SetSizerAndFit(sizerV)
+        self.Bind(UI.EVT_TEXT, self.OnText)
+        self.Bind(UI.EVT_BUTTON, self.OnOK)
+    def OnText(self, evt):
+        _ = evt.GetEventObject()
+        self.UserData[_.GetName()] = _.GetValue()
+    def OnOK(self, evt):
+        self.status = JiHuo.IdOK
+        zxdm = self.UserData.get("ZunXingDaMing")
+        dsdbs = self.UserData.get("DaSiDouBuShuo")
+        pn = self.UserData.get("PhoneNumber")
+        s = self.UserData.get("Signboard")
+        a = self.UserData.get("Address")
+        if zxdm and dsdbs and pn and s and a:
+            try:
+                assert len(pn) == 11 # TODO: 手机号码位数
+                int(pn)
+            except AssertionError, ValueError:
+                UI.MessageBox(u"手机号码可能不正确", u"警告")
+            else:
+                try:
+                    assert 12 >= len(dsdbs) >= 6
+                    for c in dsdbs:
+                        assert c in string.letters or c in string.digits
+                except AssertionError:
+                    UI.MessageBox(u"账户密码必须六位到十二位数字或字母", u"警告")
+                else:
+                    self.Destroy()
+        else:
+            UI.MessageBox(u"全部必填", u"注意")
 
 class QingDan(UI.Panel):
     def __init__(self, parent, who=None):
@@ -590,7 +652,9 @@ class InOut(UI.Dialog):
     def __init__(self, parent):
         UI.Dialog.__init__(self, parent, title=u"管理")
         self.accountLabel = UI.StaticText(self, label=u"账户", size=(AUTO, 20))
-        self.account = UI.TextCtrl(self, id=InOut.IdAccount, name=u"账户", size=(AUTO, 20), value="Administrator")
+        _ = self.Parent.database.Execute("SELECT * FROM GuanLi;")[0]
+        zxdm, dsdbs, ed, p, pn, s, a, sn = _ # ZunXingDaMing DaSiDouBuShuo ExpiredDate Power PhoneNumber Signboard Address SN
+        self.account = UI.TextCtrl(self, id=InOut.IdAccount, name=u"账户", size=(AUTO, 20), value=zxdm)
         self.passwordLabel = UI.StaticText(self, label=u"密码", size=(AUTO, 20))
         self.password = UI.TextCtrl(self, id=InOut.IdPassword, name=u"密码", size=(AUTO, 20), style=UI.TE_PASSWORD|UI.TE_PROCESS_ENTER)
         self.password.SetFocus()
@@ -616,13 +680,24 @@ class InOut(UI.Dialog):
         if _:
             InOut.User = account
             self.Destroy()
+        else:
+            UI.MessageBox(u"请核实账户和密码", u"提示")
     @staticmethod
     def Authenticate(): # TODO: 制作和许可位码相关的鉴权
         if InOut.User is None:
             UI.MessageBox(u"请登录管理账户", u"警告")
             return False
         else:
+            # TODO: 未激活是否过期、已激活是否迁移（暂时放在界面逻辑内）
             return True
+    @staticmethod
+    def MainboardSN():
+        # os.system("wmic bios get SerialNumber > sn.txt") # XXX: 导致界面进程停机而丢失数据
+        # with open("./sn.txt") as sn:
+        #     return "#".join([line.strip() for line in sn.readlines()])
+        aga = wmi.WMI()
+        m = aga.Win32_BaseBoard()[0] # FIXME: 假定普通机器都是一块主板
+        return m.SerialNumber.strip()
 
 class Frame(UI.Frame):
     IdZhangHuTimer = UI.NewId()
@@ -652,7 +727,9 @@ class Frame(UI.Frame):
     def __init__(self):
         UI.Frame.__init__(self, None, title=u"会员管理")
         self.database = Database()
-        self.database.Initialize()
+        _ = self.database.Execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table';")[0][0]
+        if not _:
+            self.database.Initialize()
         self.SetMinSize((640, 480))
         self.icon = UI.Icon("./app.ico") # FIXME: WX3.0 need a name parameter
         # self.icon.LoadFile("./app.ico")
@@ -727,12 +804,14 @@ class Frame(UI.Frame):
         if _ == Frame.IdDengRu:
             InOut.User = None
             InOut(self).ShowModal()
-            if not InOut.Authenticate():
-                self.Destroy()
+            self.OnAuthenticate()
         elif _ == Frame.IdZuoZhe:
             UI.MessageBox(u"那个秀才［www.nagexiucai.com］", u"作者")
         elif _ == Frame.IdJiHuo:
-            UI.TextEntryDialog(self, u"激活码（微信添加nagexiucai好友申请）", u"激活").ShowModal()
+            dlg = UI.TextEntryDialog(self, u"激活码（微信添加nagexiucai好友申请）", u"激活")
+            dlg.ShowModal()
+            code = dlg.GetValue()
+            self.OnLicenseCheck(code)
         elif _ == Frame.IdDanXiang and self.status != Frame.IdDanXiang:
             self.sizer.Add(DanXiang(self), proportion=AUTO, flag=UI.EXPAND|UI.ALL)
         elif _ == Frame.IdTaoCan and self.status != Frame.IdTaoCan:
@@ -754,12 +833,57 @@ class Frame(UI.Frame):
         self.Fit()
         self.PostSizeEvent()
         self.status = _
+    def OnLicenseCheck(self, code):
+        try:
+            i, ii = code.split("#")
+            _i = int(i)
+            _ii = int(ii)
+            i_ = float(i)
+            ii_ = float(ii)
+            assert _i == i_
+            assert _ii == ii_
+            assert (_i + _ii) / (_i - _ii) == 2  # XXX: 换成9527还须论证
+        except (ValueError, AssertionError):
+            UI.MessageBox(u"非法激活码", u"警告")
+        else:
+            data = {}
+            dlg = JiHuo(self, u"激活", data)
+            dlg.ShowModal()
+            print data
+            zxdm = data.get("ZunXingDaMing")
+            dsdbs = data.get("DaSiDouBuShuo")
+            pn = data.get("PhoneNumber")
+            s = data.get("Signboard")
+            a = data.get("Address")
+            msn = InOut.MainboardSN()
+            if dlg.status == JiHuo.IdOK:
+                self.database.Execute(u"INSERT INTO GuanLi VALUES ('{zxdm}', '{dsdbs}', '{ed}', '{p}', '{pn}', '{s}', '{a}', '{sn}');"
+                                      .format(zxdm=zxdm, dsdbs=dsdbs, ed="2049-10-01 00:00:00", p='ALL', pn=pn, s=s, a=a, sn=msn)) # 插入新管理员
+                self.database.Execute("DELETE FROM GuanLi WHERE ZunXingDaMing='nagexiucai.com';")  # 删除试用账户
+                UI.MessageBox(u"已经激活（建议重新登入）", u"恭喜")
+            else:
+                UI.MessageBox(u"未完成激活（请输入全部注册信息并确认）", u"提示")
+    def OnAuthenticate(self):
+        if not InOut.Authenticate():
+            zxdm, dsdbs, ed, p, pn, s, a, sn = self.database.Execute("SELECT * FROM GuanLi;")[0]
+            if zxdm == "nagexiucai.com":
+                now = datetime.datetime.now()
+                ed = datetime.datetime.strptime(ed, "%Y-%m-%d %H:%M:%S")
+                if now > ed:
+                    UI.MessageBox(u"试用期已尽请激活", u"抱歉")
+                else:
+                    self.Destroy()
+            else:
+                msn = InOut.MainboardSN()
+                if msn != sn:
+                    UI.MessageBox(u"新设备需要重新激活", u"警告")
+                else:
+                    self.Destroy()
     def OnTimer(self, evt):
         _ = evt.GetId()
         if _ == Frame.IdZhangHuTimer:
             InOut(self).ShowModal()
-            if not InOut.Authenticate():
-                self.Destroy()
+            self.OnAuthenticate()
 
 class App(UI.App):
     def __init__(self, frame):
