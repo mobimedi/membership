@@ -9,6 +9,8 @@
 
 等常见业态。
 
+**[下载地址][8]（暗号ngxc没错）**。
+
 ## 用户界面
 
 双击membershipaio.exe即可。
@@ -135,6 +137,13 @@
 
 ![][60]
 
+激活码验证通过后，还需要认真填写店主信息，**虚假信息将影响技术支持**！
+
+![][61]
+
+## 客服
+- QQ：178654886
+
 ---
 [0]: ./picture/launcher.png
 [1]: ./picture/face.png
@@ -155,3 +164,5 @@
 [44]: ./picture/bill-pay-not-membership.png
 [50]: ./picture/bill-list.png
 [60]: ./picture/about-activate.png
+[61]: ./picture/about-activate-information.png
+[8]: https://share.weiyun.com/799a5a5304daa1306406347e60809fb9

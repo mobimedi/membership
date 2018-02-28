@@ -9,3 +9,5 @@ pause
 echo ´ò°ü
 pyinstaller all-in-one.py --clean -w -F -n membershipaio -i app.ico --version-file version.txt
 copy /Y app.ico dist
+
+pause

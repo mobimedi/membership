@@ -423,7 +423,7 @@ class HuiYuan(UI.Panel):
                     record.append(float(xx) if x == "Balance" else int(xx) if x == "Credit" else xx)
                 record = tuple(record)
                 _.AppendItem(record)
-                self.Parent.database.Execute("INSERT INTO HuiYuan VALUES ('%s', '%s', %0.2f, %d);" % record)
+                self.Parent.database.Execute(u"INSERT INTO HuiYuan VALUES ('%s', '%s', %0.2f, %d);" % record)
             else:
                 for i, x in enumerate(self.title):
                     _.SetValue(data.get(x), r, i)
@@ -686,7 +686,7 @@ class InOut(UI.Dialog):
     def OnOK(self, evt):
         account = self.account.GetValue()
         password = self.password.GetValue()
-        _ = self.Parent.database.Execute("SELECT * FROM GuanLi WHERE ZunXingDaMing='{account}' AND DaSiDouBuShuo='{password}';".format(account=account, password=password))
+        _ = self.Parent.database.Execute(u"SELECT * FROM GuanLi WHERE ZunXingDaMing='{account}' AND DaSiDouBuShuo='{password}';".format(account=account, password=password))
         if _:
             InOut.User = account
             self.Destroy()

@@ -35,7 +35,7 @@ VSVersionInfo(
         StringStruct(u'LegalCopyright', u'NaGeXiuCai.COM All Rights Reserved'),
         StringStruct(u'OriginalFilename', u'membershipaio.exe'),
         StringStruct(u'ProductName', u'MembershipAIO Application'),
-        StringStruct(u'ProductVersion', u'0.0.0.1')])
+        StringStruct(u'ProductVersion', u'1.0.0.0')])
       ]), 
     VarFileInfo([VarStruct(u'Translation', [2052, 1200])])
   ]
