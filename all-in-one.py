@@ -13,6 +13,7 @@ import string
 import datetime
 import wmi
 import base64
+import uuid
 
 DBFILE = "./aio.dll"
 TIMESTAMP = lambda: datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -37,6 +38,7 @@ class Database:
             Database.CONNECT.close()
     def Initialize(self):
         CREATE = (
+            "CREATE TABLE Trojan (UUID TEXT, SN TEXT);",
             "CREATE TABLE GuanLi (ZunXingDaMing TEXT, DaSiDouBuShuo TEXT, ExpiredDate TEXT, Power TEXT, PhoneNumber TEXT, Signboard TEXT, Address TEXT, SN TEXT);",
 
             "CREATE TABLE HuiYuan (PhoneNumber TEXT, Name TEXT, Balance FLOAT, Credit INT);",
@@ -47,11 +49,12 @@ class Database:
         )
         expiredDate = (datetime.datetime.now() + datetime.timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
         INSERT = (
+            "INSERT INTO Trojan VALUES ('{UUID}', '{SN}');".format(UUID=str(uuid.uuid1()), SN=InOut.MainboardSN()),
             u"INSERT INTO GuanLi VALUES ('nagexiucai.com', 'nagexiucai.com', '{0}', 'ALL', 'nagexiucai.com', 'nagexiucai.com', 'nagexiucai.com', 'IGNORED');".format(expiredDate),
 
-            u"INSERT INTO HuiYuan VALUES ('086182029*****', '那个秀才', 33.33, 0);",
-            u"INSERT INTO HuiYuan VALUES ('086182918*****', '大海', 77.77, 0);",
-            u"INSERT INTO HuiYuan VALUES ('08688888888888', '狗娃', 228.22, 7);",
+            u"INSERT INTO HuiYuan VALUES ('182029*****', '那个秀才', 33.33, 0);",
+            u"INSERT INTO HuiYuan VALUES ('182918*****', '大海', 77.77, 0);",
+            u"INSERT INTO HuiYuan VALUES ('88888888888', '狗娃', 228.22, 7);",
 
             u"INSERT INTO DanXiang VALUES ('X', '吹一', 30.00);",
             u"INSERT INTO DanXiang VALUES ('Y', '染一', 90.00);",
@@ -77,7 +80,7 @@ class Database:
             u"INSERT INTO YouHui VALUES ('i', '新春五折特惠', 0.50);",
             u"INSERT INTO YouHui VALUES ('j', '开业八八折券', 0.88);",
 
-            u"INSERT INTO QingDan VALUES ('08688888888888', '吹一加染一，洗二', '新春五折特惠', 71.78, 228.22, '2018-02-15 20:30:00');"
+            u"INSERT INTO QingDan VALUES ('88888888888', '吹一加染一，洗二', '新春五折特惠', 71.78, 228.22, '2018-02-15 20:30:00');"
         )
         for _ in CREATE:
             self.Execute(_)
@@ -746,7 +749,10 @@ class Frame(UI.Frame):
         self.sb.SetFieldsCount()
         self.sb.SetStatusWidths([AUTO]) # FIXME: WX3.0 need list parameter
         # self.sb.SetStatusWidths((AUTO,))
-        self.sb.SetStatusText(u"未激活")
+        if self.database.Execute("SELECT * FROM GuanLi WHERE ZunXingDaMing!='nagexiucai.com';"):
+            self.sb.SetStatusText(u"已激活")
+        else:
+            self.sb.SetStatusText(u"未激活")
         self.SetStatusBar(self.sb)
         self.mb = UI.MenuBar()
         self.SetMenuBar(self.mb)
@@ -878,6 +884,8 @@ class Frame(UI.Frame):
                 if msn != sn:
                     UI.MessageBox(u"新设备需要重新激活", u"警告")
                     self.Destroy()
+        else:
+            self.Destroy()
     def OnTimer(self, evt):
         _ = evt.GetId()
         if _ == Frame.IdZhangHuTimer:
