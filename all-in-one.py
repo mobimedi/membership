@@ -12,6 +12,7 @@ import sys
 import string
 import datetime
 import wmi
+import base64
 
 DBFILE = "./aio.dll"
 TIMESTAMP = lambda: datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -19,6 +20,12 @@ TIMESTAMP = lambda: datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 UNIQUE = 1
 FIXED = 0
 DEFAULT = AUTO = -1
+
+PhoneNumberLength = 11
+PasswordLengthMax = 12
+PasswordLengthMin = 6
+MagicNumber = 9527
+MagicAlgorithm = lambda i, ii: i%MagicNumber == 0 and ii%MagicNumber == 0
 
 class Database:
     CONNECT = None
@@ -177,13 +184,13 @@ class JiHuo(UI.Dialog):
         a = self.UserData.get("Address")
         if zxdm and dsdbs and pn and s and a:
             try:
-                assert len(pn) == 11 # TODO: 手机号码位数
+                assert len(pn) == PhoneNumberLength # TODO: 手机号码位数
                 int(pn)
             except AssertionError, ValueError:
                 UI.MessageBox(u"手机号码可能不正确", u"警告")
             else:
                 try:
-                    assert 12 >= len(dsdbs) >= 6
+                    assert PasswordLengthMax >= len(dsdbs) >= PasswordLengthMin
                     for c in dsdbs:
                         assert c in string.letters or c in string.digits
                 except AssertionError:
@@ -835,21 +842,15 @@ class Frame(UI.Frame):
         self.status = _
     def OnLicenseCheck(self, code):
         try:
-            i, ii = code.split("#")
-            _i = int(i)
-            _ii = int(ii)
-            i_ = float(i)
-            ii_ = float(ii)
-            assert _i == i_
-            assert _ii == ii_
-            assert (_i + _ii) / (_i - _ii) == 2  # XXX: 换成9527还须论证
-        except (ValueError, AssertionError):
+            i, ii = base64.b64decode(code).split("#")
+            i, ii = float(i), float(ii)
+            assert MagicAlgorithm(i, ii)
+        except (ValueError, TypeError, AssertionError):
             UI.MessageBox(u"非法激活码", u"警告")
         else:
             data = {}
             dlg = JiHuo(self, u"激活", data)
             dlg.ShowModal()
-            print data
             zxdm = data.get("ZunXingDaMing")
             dsdbs = data.get("DaSiDouBuShuo")
             pn = data.get("PhoneNumber")
@@ -864,20 +865,18 @@ class Frame(UI.Frame):
             else:
                 UI.MessageBox(u"未完成激活（请输入全部注册信息并确认）", u"提示")
     def OnAuthenticate(self):
-        if not InOut.Authenticate():
+        if InOut.Authenticate():
             zxdm, dsdbs, ed, p, pn, s, a, sn = self.database.Execute("SELECT * FROM GuanLi;")[0]
             if zxdm == "nagexiucai.com":
                 now = datetime.datetime.now()
                 ed = datetime.datetime.strptime(ed, "%Y-%m-%d %H:%M:%S")
                 if now > ed:
                     UI.MessageBox(u"试用期已尽请激活", u"抱歉")
-                else:
                     self.Destroy()
             else:
                 msn = InOut.MainboardSN()
                 if msn != sn:
                     UI.MessageBox(u"新设备需要重新激活", u"警告")
-                else:
                     self.Destroy()
     def OnTimer(self, evt):
         _ = evt.GetId()
