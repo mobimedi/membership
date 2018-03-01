@@ -15,6 +15,8 @@ DELTATIMESTAMP = lambda t: (datetime.datetime.now() + t).strftime('%Y-%m-%d %H:%
 DELTADAYS = lambda d: datetime.timedelta(days=d)
 PHONENUMBER = re.compile("^1([358][0-9]|4[579]|66|7[0135678]|9[89])[0-9]{8}$")
 ISPHONENUMBER = lambda pn: PHONENUMBER.match(pn)
+EventQingDanType = wx.NewEventType()
+EventQingDanBinder = wx.PyEventBinder(EventQingDanType, 1)
 
 
 def IMHO(db):
@@ -37,6 +39,7 @@ def IMHO(db):
 
 class Frame(wx.Frame):
     FontPointSize = 9
+    IdBill = wx.NewId()
 
     # TODO: 将一票同质布局类归一
     class Register(wx.Dialog):
@@ -115,7 +118,8 @@ class Frame(wx.Frame):
             sizerV = wx.BoxSizer(wx.VERTICAL)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"用户"), 0, wx.EXPAND)
-            self.account = wx.TextCtrl(self, size=(160, 20))
+            name = parent.database.Execute("SELECT Name FROM Manager;")[0][0]
+            self.account = wx.TextCtrl(self, size=(160, 20), value=name)
             sizerH.Add(self.account, 0, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
@@ -136,7 +140,6 @@ class Frame(wx.Frame):
                 password = self.password.GetValue()
                 _ = self.Parent.database.Execute(u"SELECT * FROM Manager WHERE (PhoneNumber='{account}' OR Name='{account}') AND Password='{password}';"
                                                  .format(account=account, password=password))
-                print _
                 if _:
                     name, password, expired, phonenumber, address, verifycode = _[0]
                     now = datetime.datetime.now()
@@ -156,8 +159,9 @@ class Frame(wx.Frame):
                             name = data.get("Name")
                             self.Parent.database.Execute(u"INSERT INTO Manager VALUES ('{name}', '{password}', '{expired}', '{phonenumber}', '{address}', '{verifycode}');"
                                                          .format(name=name, password=password, expired=expired, phonenumber=phonenumber, address=address, verifycode=verifycode))
-                            self.Parent.database.Execute(u"DELETE FROM Manager WHERE Name='nagexiucai';")
+                            self.Parent.database.Execute(u"DELETE FROM Manager WHERE PhoneNumber='182029*****';")
                             wx.MessageBox(u"已完成注册请新用户登陆", u"恭喜")
+                            self.Parent.mark.SetLabel(u"已注册")
                         else:
                             wx.MessageBox(u"未完成注册", u"警告")
                     else:
@@ -179,8 +183,8 @@ class Frame(wx.Frame):
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"会员账号："), 0, wx.EXPAND)
             phonenumber = parent.text.GetValue()
-            self.phonenumber = wx.StaticText(self, label=phonenumber)
-            sizerH.Add(self.phonenumber, -1, wx.EXPAND)
+            self.phonenumber = phonenumber
+            sizerH.Add(wx.StaticText(self, label=phonenumber), -1, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"会员姓名："), 0, wx.EXPAND)
@@ -215,7 +219,8 @@ class Frame(wx.Frame):
             _ = evt.GetEventObject()
             self.data[_.GetName()] = _.GetValue()
         def OnButton(self, evt):
-            if evt.GetId() == Frame.Recharge.IdOK:
+            _ = evt.GetId()
+            if _ == Frame.Recharge.IdOK:
                 money = self.data.get("Balance")
                 try:
                     money = float(money)
@@ -225,16 +230,16 @@ class Frame(wx.Frame):
                     if self.fresher:
                         if self.data.get("Name"):
                             self.Parent.database.Execute(u"INSERT INTO Member VALUES ('{phonenumber}', '{name}', {balance});"
-                                                         .format(phonenumber=self.phonenumber.GetLabel(), name=self.data.get("Name"), balance=money))
+                                                         .format(phonenumber=self.phonenumber, name=self.data.get("Name"), balance=money))
                             self.Destroy()
                         else:
                             wx.MessageBox(u"请填写会员姓名", u"警告")
                     else:
                         balance = self.data.get("BalanceReserved") + money
                         self.Parent.database.Execute("UPDATE Member SET Balance={balance} WHERE PhoneNumber='{phonenumber}';"
-                                                     .format(balance=balance, phonenumber=self.phonenumber.GetLabel()))
+                                                     .format(balance=balance, phonenumber=self.phonenumber))
                         self.Destroy()
-            elif evt.GetId() == Frame.Recharge.IdCancel:
+            elif _ == Frame.Recharge.IdCancel:
                 self.Destroy()
 
     Member = Recharge
@@ -250,12 +255,12 @@ class Frame(wx.Frame):
             sizerV = wx.BoxSizer(wx.VERTICAL)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"会员账号："), 0, wx.EXPAND)
-            self.account = "33388886666"
-            sizerH.Add(wx.StaticText(self, label=self.account), -1, wx.EXPAND)
+            self.phonenumber = parent.text.GetValue()
+            sizerH.Add(wx.StaticText(self, label=self.phonenumber), -1, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"会员姓名："), 0, wx.EXPAND)
-            self.name = "nagexiucai.com"
+            self.name, self.balance = parent.database.Execute("SELECT Name, Balance FROM Member WHERE PhoneNumber='{0}';".format(self.phonenumber))[0]
             sizerH.Add(wx.StaticText(self, label=self.name), -1, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
@@ -269,6 +274,28 @@ class Frame(wx.Frame):
             sizerV.Add(sizerH, 0, wx.EXPAND)
             self.SetFont(font)
             self.SetSizerAndFit(sizerV)
+            self.Bind(wx.EVT_BUTTON, self.OnButton)
+        def OnButton(self, evt):
+            _ = evt.GetId()
+            if _ == Frame.Pay.IdOK:
+                try:
+                    consume = float(self.consume.GetValue())
+                except ValueError as e:
+                    wx.MessageBox(u"金额错误", u"警告")
+                else:
+                    if self.balance < consume:
+                        wx.MessageBox(u"余额不足请充值", u"警告")
+                    else:
+                        balance = self.balance - consume
+                        self.Parent.database.Execute("UPDATE Member SET Balance={balance} WHERE PhoneNumber='{phonenumber}';"
+                                                     .format(balance=balance, phonenumber=self.phonenumber))
+                        self.Parent.database.Execute(u"INSERT INTO Log VALUES ('{phonenumber}', '{name}', {consume}, {balance}, '{time}');"
+                                                 .format(phonenumber=self.phonenumber, name=self.name, consume=consume, balance=balance, time=TIMESTAMP()))
+                        self.Destroy()
+                        event = wx.PyCommandEvent(eventType=EventQingDanType, id=Frame.IdBill)
+                        wx.PostEvent(self.GetParent(), event)
+            elif _ == Frame.Pay.IdCancel:
+                self.Destroy()
 
     class Bill(wx.Dialog):
         def __init__(self, parent, title):
@@ -283,12 +310,14 @@ class Frame(wx.Frame):
             self.list.InsertColumn(2, u"消费", width=120)
             self.list.InsertColumn(3, u"余额", width=120)
             self.list.InsertColumn(4, u"时间", width=200)
-            count = 999
-            i = self.list.InsertStringItem(count, "zzzzz")
-            self.list.SetStringItem(i, 1, "xxxxx")
-            self.list.SetStringItem(i, 2, "yyyyy")
-            self.list.SetStringItem(i, 3, "90")
-            self.list.SetStringItem(i, 4, "2000-01-01 00:00:00")
+            _ = parent.database.Execute("SELECT * FROM Log WHERE PhoneNumber='{0}' ORDER BY Time DESC;".format(parent.text.GetValue()))
+            count = len(_)
+            for phonenumber, name, consume, balance, time in _:
+                i = self.list.InsertStringItem(count, phonenumber)
+                self.list.SetStringItem(i, 1, name)
+                self.list.SetStringItem(i, 2, unicode(consume))
+                self.list.SetStringItem(i, 3, unicode(balance))
+                self.list.SetStringItem(i, 4, time)
             sizer.Add(self.list, 0, wx.EXPAND)
             self.SetSizerAndFit(sizer)
 
@@ -302,7 +331,10 @@ class Frame(wx.Frame):
         Frame.FontPointSize = fontPointSize = font.GetPointSize()
         panel = wx.Panel(self)
         self.sizer = wx.GridSizer(3, 3, 5, 5)
-        self.mark = wx.StaticText(panel, label=u"未注册", style=wx.ALIGN_CENTER)
+        if self.database.Execute("SELECT * FROM Manager WHERE PhoneNumber!='182029*****';"):
+            self.mark = wx.StaticText(panel, label=u"已注册", style=wx.ALIGN_CENTRE)
+        else:
+            self.mark = wx.StaticText(panel, label=u"未注册", style=wx.ALIGN_CENTER)
         font.SetPointSize(fontPointSize * 2.0)
         self.mark.SetOwnFont(font)
         self.brand = wx.StaticText(panel, label=u"极陋会员管理", style=wx.ALIGN_CENTER)
@@ -320,7 +352,7 @@ class Frame(wx.Frame):
         self.recharge.Bind(wx.EVT_BUTTON, self.OnRecharge)
         self.pay = wx.Button(panel, label=u"结账")
         self.pay.Bind(wx.EVT_BUTTON, self.OnPay)
-        self.bill = wx.Button(panel, label=u"账单")
+        self.bill = wx.Button(panel, label=u"账单", id=Frame.IdBill)
         self.bill.Bind(wx.EVT_BUTTON, self.OnBill)
         font.SetPointSize(fontPointSize * 3.0)
         self.recharge.SetOwnFont(font)
@@ -358,6 +390,7 @@ class Frame(wx.Frame):
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnLogin)
         self.timer.Start(600, True)
+        self.Bind(EventQingDanBinder, self.OnBill)
 
     def Check(self):
         phonenumber = self.text.GetValue()
