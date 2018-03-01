@@ -3,58 +3,102 @@
 # MOaS == Membership Open-and-Shut
 
 import wx
-from wx.lib.embeddedimage import PyEmbeddedImage
+from resource import ICON
+from db import Database
+import datetime
+import base64
 
 
-ICON = PyEmbeddedImage(
-    "AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAABAT/AQYG/wIICP8FDQ7/CBIU/wwWG/8SHiT/FiQs/xssNf8WJiz/ITM8/xwsNv8ZKDD/EiMt/wg"
-    "WG/8BDA7/AQUE/wEGBv8FDAz/CRMW/wwWGv8QGyH/FiQs/x4uOf8qPUv/MERU/ys/TP8rPk3/JzxK/yI0Qv8RISr/BRMU/wAFBP8FDAz/CBIS/woTGP8TICf/GCUt/xopMv8eMDr/KT5N/y9FUv89U2T/PVhs/yc"
-    "7Sf8dMUD/Gi46/wYVF/8BBgf/BAsL/wYQEf8QHSH/ER8k/xcmK/8dLjX/KD1J/yo9Sv8zSVr/QVpr/0RgeP9Qcov/NEte/x8zPv8PICb/AQQE/wUMDv8KExf/EB0g/xEeIf8fLzX/HS44/zFGUf8sPkr/QFls/zp"
-    "PXv9La4T/RmV8/01tg/8wSVr/ESIm/wIEBf8ECgv/DBca/w4aHf8PGx7/IDA5/xssNP8fMTj/KTpG/0Faa/9JZn3/TnCL/1J0jv8tR1r/IztJ/xosNP8AAQH/BAkL/wYPE/8LFhr/Dx0g/x0tOP8cLDf/Fict/xw"
-    "rN/82TF//Plx0/1Byjf9FZn//WXyN/0Fgcf8dMTj/AQMD/wMHCf8FDRD/ChUZ/w8cI/8RHiX/FCIn/xAeJP8YJy//JjxL/zxadP9DZYH/VnyW/12Gm/9EZ3f/Gi82/wABAf8CBQb/BQwP/wgRFv8LFx//EiAp/xI"
-    "eKP8VIzD/FiUt/yI4Sv8vTGb/QWSB/1F4lP9KcIT/NVRi/xcqMP8BAQH/AgUG/wMMDv8GERX/BxIZ/wwXHv8XJDH/FiMw/xYkMv8iN0j/KERe/zxfe/9BZoH/P2J0/zpYaP8QIST/AAAA/wMHCP8ECg7/BhAV/wg"
-    "RGP8OGiX/DBgh/xQjM/8PGiP/Giw8/yZBW/89X3r/RWmD/0pvg/8uTVn/EiIk/wABAf8AAgL/AwgK/wQOEf8GDxT/ChYg/xMhMP8WKD7/GStB/x84Tv8qRl7/RGeD/0Vnfv80VGb/LUdU/wkVFv8AAAD/AQIC/wI"
-    "GBv8CCAv/Bg4T/wgRGv8HFB3/EB4s/xQoOP8lP1b/JT5V/zpXcv82VWz/Ollu/x4zPv8CCQn/AAEA/wAAAP8CBQb/AwgI/wQKDv8HEBr/BhEX/w4ZI/8XKDn/HzNH/y1EYP8tSF//KEFV/yI6Sv8NHCH/AAIC/wA"
-    "BAP8AAAD/AAAA/wIFBv8CCAv/AwsQ/wUMEv8HERr/FCAu/xgnOf8WJjn/JTpO/xQoNv8WKTT/BhMW/wABAf8BAQD/AAAA/wAAAP8BAQH/AQUG/wEFB/8BBQf/BAkO/wcNE/8LExz/Dxgj/woWH/8PHCX/CBMZ/wI"
-    "JCv8AAQH/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
-)
+TIMESTAMP = lambda: datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+DELTATIMESTAMP = lambda t: (datetime.datetime.now() + t).strftime('%Y-%m-%d %H:%M:%S')
+DELTADAYS = lambda d: datetime.timedelta(days=d)
+
+
+def IMHO(db):
+    if not db.Execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table';")[0][0]:
+        CREATE = (
+            "CREATE TABLE Manager (Name TEXT, Password TEXT, Expired TEXT, PhoneNumber TEXT, Address TEXT, VerifyCode TEXT);",
+            "CREATE TABLE Member (PhoneNumber TEXT, Name TEXT, Balance FLOAT);",
+            "CREATE TABLE Log (PhoneNumber TEXT, Name TEXT, Consume FLOAT, Balance FLOAT, Time TEXT);"
+        )
+        INSERT = (
+            u"INSERT INTO Manager VALUES ('nagexiucai', 'nagexiucai', '{0}', '182029*****', '中国西安', 'IGNORED');".format(DELTATIMESTAMP(DELTADAYS(30))),
+            u"INSERT INTO Member VALUES ('182029*****', '那个秀才', 888.0);",
+            u"INSERT INTO Log VALUES ('182029*****', '那个秀才', 111.0, 888.0, '{0}');".format(TIMESTAMP())
+        )
+        for _ in CREATE:
+            db.Execute(_)
+        for _ in INSERT:
+            db.Execute(_)
+
 
 class Frame(wx.Frame):
     FontPointSize = 9
 
     # TODO: 将一票同质布局类归一
     class Register(wx.Dialog):
-        def __init__(self, parent, title):
+        IdOK = wx.NewId()
+        def __init__(self, parent, title, data):
             wx.Dialog.__init__(self, parent, title=title)
+            self.data = data
             font = self.GetFont()
             font.SetPointSize(Frame.FontPointSize * 1.5)
             self.CenterOnParent()
             sizerV = wx.BoxSizer(wx.VERTICAL)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"店长姓名"), 0, wx.EXPAND)
-            self.leaadername = wx.TextCtrl(self, size=(160, 20))
-            sizerH.Add(self.leaadername, 0, wx.EXPAND)
+            self.name = wx.TextCtrl(self, size=(160, 20), name="Name")
+            sizerH.Add(self.name, 0, wx.EXPAND)
+            sizerV.Add(sizerH, 0, wx.EXPAND)
+            sizerH = wx.BoxSizer(wx.HORIZONTAL)
+            sizerH.Add(wx.StaticText(self, label=u"登陆密码"), 0, wx.EXPAND)
+            self.password = wx.TextCtrl(self, size=(160, 20), name="Password")
+            sizerH.Add(self.password, 0, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"手机号码"), 0, wx.EXPAND)
-            self.phonenumber = wx.TextCtrl(self, size=(160, 20))
+            self.phonenumber = wx.TextCtrl(self, size=(160, 20), name="PhoneNumber")
             sizerH.Add(self.phonenumber, 0, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"地址招牌"), 0, wx.EXPAND)
-            self.addresssign = wx.TextCtrl(self, size=(160, 20))
+            self.addresssign = wx.TextCtrl(self, size=(160, 20), name="Address")
             sizerH.Add(self.addresssign, 0, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"验证编码"), 0, wx.EXPAND)
-            self.verifycode = wx.TextCtrl(self, size=(160, 20))
+            self.verifycode = wx.TextCtrl(self, size=(160, 20), name="VerifyCode")
             sizerH.Add(self.verifycode, 0, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
-            button = wx.Button(self, id=wx.ID_OK, label=u"确认")
+            button = wx.Button(self, id=Frame.Register.IdOK, label=u"确认")
+            button.Bind(wx.EVT_BUTTON, self.OnOK)
             sizerV.Add(button, 0, wx.EXPAND)
             self.SetSizerAndFit(sizerV)
+            self.Bind(wx.EVT_TEXT, self.OnText)
+            self.status = None
+        def OnText(self, evt):
+            _ = evt.GetEventObject()
+            self.data[_.GetName()] = _.GetValue()
+        def OnOK(self, evt):
+            _ = self.verifycode.GetValue()
+            try:
+                __ = base64.b64decode(_)
+                i, ii, iii = __.split("#")
+                i = int(i)
+                ii = int(ii)
+                iii = int(iii)
+                assert i%9527 == 0 and ii%9527 == 0
+                self.data[self.verifycode.GetName()] = DELTATIMESTAMP(DELTADAYS(iii))
+                self.data["VC"] = _
+            except (TypeError, ValueError, AssertionError) as e:
+                wx.MessageBox(u"验证编码错误", u"警告")
+            else:
+                self.status = Frame.Register.IdOK
+                self.Destroy()
+
 
     class Login(wx.Dialog):
+        IdOK = wx.NewId()
         def __init__(self, parent, title):
             wx.Dialog.__init__(self, parent, title=title)
             font = self.GetFont()
@@ -63,15 +107,15 @@ class Frame(wx.Frame):
             sizerV = wx.BoxSizer(wx.VERTICAL)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"用户"), 0, wx.EXPAND)
-            self.user = wx.TextCtrl(self, size=(160, 20))
-            sizerH.Add(self.user, 0, wx.EXPAND)
+            self.account = wx.TextCtrl(self, size=(160, 20))
+            sizerH.Add(self.account, 0, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"密码"), 0, wx.EXPAND)
-            self.password = wx.TextCtrl(self, size=(160, 20), style=wx.TE_PASSWORD)
+            self.password = wx.TextCtrl(self, size=(160, 20))
             sizerH.Add(self.password, 0, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
-            self.ok = wx.Button(self, id=wx.ID_OK, label=u"登陆")
+            self.ok = wx.Button(self, id=Frame.Login.IdOK, label=u"登陆")
             sizerV.Add(self.ok, 0, wx.EXPAND)
             self.SetSizerAndFit(sizerV)
             self.ok.Bind(wx.EVT_BUTTON, self.OnOK)
@@ -79,11 +123,43 @@ class Frame(wx.Frame):
 
         def OnOK(self, evt):
             self.status = evt.GetId()
-            if self.status == wx.ID_OK:
-                pass
-            self.Destroy()
+            if self.status == Frame.Login.IdOK:
+                account = self.account.GetValue()
+                password = self.password.GetValue()
+                _ = self.Parent.database.Execute(u"SELECT * FROM Manager WHERE (PhoneNumber='{account}' OR Name='{account}') AND Password='{password}';"
+                                                 .format(account=account, password=password))
+                print _
+                if _:
+                    name, password, expired, phonenumber, address, verifycode = _[0]
+                    now = datetime.datetime.now()
+                    expired = datetime.datetime.strptime(expired, "%Y-%m-%d %H:%M:%S")
+                    if now > expired:
+                        wx.MessageBox(u"试用期结束请注册", u"警告")
+                        data = {}
+                        dlg = Frame.Register(self, u"注册", data)
+                        dlg.ShowModal()
+                        if dlg.status == Frame.Register.IdOK:
+                            vc = data.get("VC")
+                            verifycode = data.get("VerifyCode")
+                            address = data.get("Address")
+                            phonenumber = data.get("PhoneNumber")
+                            expired = verifycode
+                            password = data.get("Password")
+                            name = data.get("Name")
+                            self.Parent.database.Execute(u"INSERT INTO Manager VALUES ('{name}', '{password}', '{expired}', '{phonenumber}', '{address}', '{verifycode}');"
+                                                         .format(name=name, password=password, expired=expired, phonenumber=phonenumber, address=address, verifycode=verifycode))
+                            self.Parent.database.Execute(u"DELETE FROM Manager WHERE Name='nagexiucai';")
+                            wx.MessageBox(u"已完成注册请新用户登陆", u"恭喜")
+                        else:
+                            wx.MessageBox(u"未完成注册", u"警告")
+                    else:
+                        self.Destroy()
+                else:
+                    wx.MessageBox(u"用户或密码错误", u"警告")
 
     class Recharge(wx.Dialog):
+        IdOK = wx.NewId()
+        IdCancel = wx.NewId()
         def __init__(self, parent, title):
             wx.Dialog.__init__(self, parent, title=title)
             font = self.GetFont()
@@ -92,8 +168,8 @@ class Frame(wx.Frame):
             sizerV = wx.BoxSizer(wx.VERTICAL)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"会员账号："), 0, wx.EXPAND)
-            account = "33388886666"
-            sizerH.Add(wx.StaticText(self, label=account), -1, wx.EXPAND)
+            phonenumber = "33388886666"
+            sizerH.Add(wx.StaticText(self, label=phonenumber), -1, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"会员姓名："), 0, wx.EXPAND)
@@ -108,13 +184,16 @@ class Frame(wx.Frame):
             self.figure = wx.TextCtrl(self, size=(120, 20))
             sizerV.Add(self.figure, 0, wx.EXPAND)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
-            sizerH.Add(wx.Button(self, id=wx.ID_OK, label=u"确认"), 0, wx.EXPAND)
-            sizerH.Add(wx.Button(self, id=wx.ID_CANCEL, label=u"取消"), 0, wx.EXPAND)
+            sizerH.Add(wx.Button(self, id=Frame.Recharge.IdOK, label=u"确认"), 0, wx.EXPAND)
+            sizerH.Add(wx.Button(self, id=Frame.Recharge.IdCancel, label=u"取消"), 0, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             self.SetFont(font)
             self.SetSizerAndFit(sizerV)
+    Member = Recharge
 
     class Pay(wx.Dialog):
+        IdOK = wx.NewId()
+        IdCancel = wx.NewId()
         def __init__(self, parent, title):
             wx.Dialog.__init__(self, parent, title=title)
             font = self.GetFont()
@@ -137,8 +216,8 @@ class Frame(wx.Frame):
             sizerH.Add(self.consume, -1, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
-            sizerH.Add(wx.Button(self, id=wx.ID_OK, label=u"支付"), 0, wx.EXPAND)
-            sizerH.Add(wx.Button(self, id=wx.ID_CANCEL, label=u"放弃"), 0, wx.EXPAND)
+            sizerH.Add(wx.Button(self, id=Frame.Pay.IdOK, label=u"支付"), 0, wx.EXPAND)
+            sizerH.Add(wx.Button(self, id=Frame.Pay.IdCancel, label=u"放弃"), 0, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             self.SetFont(font)
             self.SetSizerAndFit(sizerV)
@@ -167,6 +246,8 @@ class Frame(wx.Frame):
 
     def __init__(self):
         wx.Frame.__init__(self, None, title=u"会员管理")
+        self.database = Database()
+        IMHO(self.database)
         self.SetIcon(ICON.GetIcon())
         self.SetMinSize((1200, 600))
         font = self.GetFont()
@@ -245,8 +326,11 @@ class Frame(wx.Frame):
     def OnLogin(self, evt=None):
         dlg = Frame.Login(self, u"登陆")
         dlg.ShowModal()
-        if dlg.status == wx.ID_OK: pass
-        # self.text.Enable()
+        if dlg.status == Frame.Login.IdOK:
+            self.text.Enable()
+        else:
+            wx.MessageBox(u"必须登陆", u"警告")
+            self.Destroy()
 
     def OnRegister(self, evt):
         dlg = Frame.Register(self, u"激活")
