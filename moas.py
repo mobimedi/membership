@@ -7,11 +7,14 @@ from resource import ICON
 from db import Database
 import datetime
 import base64
+import re
 
 
 TIMESTAMP = lambda: datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 DELTATIMESTAMP = lambda t: (datetime.datetime.now() + t).strftime('%Y-%m-%d %H:%M:%S')
 DELTADAYS = lambda d: datetime.timedelta(days=d)
+PHONENUMBER = re.compile("^1([358][0-9]|4[579]|66|7[0135678]|9[89])[0-9]{8}$")
+ISPHONENUMBER = lambda pn: PHONENUMBER.match(pn)
 
 
 def IMHO(db):
@@ -93,8 +96,13 @@ class Frame(wx.Frame):
             except (TypeError, ValueError, AssertionError) as e:
                 wx.MessageBox(u"验证编码错误", u"警告")
             else:
-                self.status = Frame.Register.IdOK
-                self.Destroy()
+                try:
+                    assert ISPHONENUMBER(self.phonenumber.GetValue())
+                except AssertionError as e:
+                    wx.MessageBox(u"手机号码错误", u"警告")
+                else:
+                    self.status = Frame.Register.IdOK
+                    self.Destroy()
 
 
     class Login(wx.Dialog):
@@ -134,7 +142,7 @@ class Frame(wx.Frame):
                     now = datetime.datetime.now()
                     expired = datetime.datetime.strptime(expired, "%Y-%m-%d %H:%M:%S")
                     if now > expired:
-                        wx.MessageBox(u"试用期结束请注册", u"警告")
+                        wx.MessageBox(u"试用期结束请微信加友nagexiucai申请注册", u"警告")
                         data = {}
                         dlg = Frame.Register(self, u"注册", data)
                         dlg.ShowModal()
@@ -160,35 +168,75 @@ class Frame(wx.Frame):
     class Recharge(wx.Dialog):
         IdOK = wx.NewId()
         IdCancel = wx.NewId()
-        def __init__(self, parent, title):
+        def __init__(self, parent, title, fresher=False):
             wx.Dialog.__init__(self, parent, title=title)
+            self.fresher = fresher
+            self.data = {}
             font = self.GetFont()
             font.SetPointSize(Frame.FontPointSize * 3.5)
             self.CenterOnParent()
             sizerV = wx.BoxSizer(wx.VERTICAL)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"会员账号："), 0, wx.EXPAND)
-            phonenumber = "33388886666"
-            sizerH.Add(wx.StaticText(self, label=phonenumber), -1, wx.EXPAND)
+            phonenumber = parent.text.GetValue()
+            self.phonenumber = wx.StaticText(self, label=phonenumber)
+            sizerH.Add(self.phonenumber, -1, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.StaticText(self, label=u"会员姓名："), 0, wx.EXPAND)
-            name = "nagexiucai.com"
-            sizerH.Add(wx.StaticText(self, label=name), -1, wx.EXPAND)
+            if fresher:
+                name, balance = u"新会员", 0.0
+                sizerH.Add(wx.TextCtrl(self, value=name, name="Name"), -1, wx.EXPAND)
+            else:
+                name, balance = parent.database.Execute("SELECT Name, Balance FROM Member WHERE PhoneNumber='{0}';".format(phonenumber))[0]
+                sizerH.Add(wx.StaticText(self, label=name), -1, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
-            sizerH.Add(wx.StaticText(self, label=u"账户余额："), 0, wx.EXPAND)
-            balance = 0.00
-            sizerH.Add(wx.StaticText(self, label=unicode(balance)), -1, wx.EXPAND)
+            self.data["BalanceReserved"] = balance
+            if fresher:
+                sizerH.Add(wx.StaticText(self, label=u"账户预存："), 0, wx.EXPAND)
+                sizerH.Add(wx.TextCtrl(self, value=unicode(balance), name="Balance"), -1, wx.EXPAND)
+            else:
+                sizerH.Add(wx.StaticText(self, label=u"账户余额："), 0, wx.EXPAND)
+                sizerH.Add(wx.StaticText(self, label=unicode(balance)), -1, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
-            self.figure = wx.TextCtrl(self, size=(120, 20))
-            sizerV.Add(self.figure, 0, wx.EXPAND)
+            if not fresher:
+                self.figure = wx.TextCtrl(self, size=(120, 20), name="Balance")
+                sizerV.Add(self.figure, 0, wx.EXPAND)
             sizerH = wx.BoxSizer(wx.HORIZONTAL)
             sizerH.Add(wx.Button(self, id=Frame.Recharge.IdOK, label=u"确认"), 0, wx.EXPAND)
             sizerH.Add(wx.Button(self, id=Frame.Recharge.IdCancel, label=u"取消"), 0, wx.EXPAND)
             sizerV.Add(sizerH, 0, wx.EXPAND)
             self.SetFont(font)
             self.SetSizerAndFit(sizerV)
+            self.Bind(wx.EVT_TEXT, self.OnText)
+            self.Bind(wx.EVT_BUTTON, self.OnButton)
+        def OnText(self, evt):
+            _ = evt.GetEventObject()
+            self.data[_.GetName()] = _.GetValue()
+        def OnButton(self, evt):
+            if evt.GetId() == Frame.Recharge.IdOK:
+                money = self.data.get("Balance")
+                try:
+                    money = float(money)
+                except (TypeError, ValueError) as e:
+                    wx.MessageBox(u"金额错误", u"警告")
+                else:
+                    if self.fresher:
+                        if self.data.get("Name"):
+                            self.Parent.database.Execute(u"INSERT INTO Member VALUES ('{phonenumber}', '{name}', {balance});"
+                                                         .format(phonenumber=self.phonenumber.GetLabel(), name=self.data.get("Name"), balance=money))
+                            self.Destroy()
+                        else:
+                            wx.MessageBox(u"请填写会员姓名", u"警告")
+                    else:
+                        balance = self.data.get("BalanceReserved") + money
+                        self.Parent.database.Execute("UPDATE Member SET Balance={balance} WHERE PhoneNumber='{phonenumber}';"
+                                                     .format(balance=balance, phonenumber=self.phonenumber.GetLabel()))
+                        self.Destroy()
+            elif evt.GetId() == Frame.Recharge.IdCancel:
+                self.Destroy()
+
     Member = Recharge
 
     class Pay(wx.Dialog):
@@ -261,7 +309,7 @@ class Frame(wx.Frame):
         font.SetPointSize(fontPointSize * 4.5)
         self.brand.SetOwnFont(font)
         sizerV = wx.BoxSizer(wx.VERTICAL)
-        self.text = wx.TextCtrl(panel, style=wx.TE_CENTER | wx.TE_PROCESS_ENTER)
+        self.text = wx.TextCtrl(panel, style=wx.TE_CENTER)
         self.text.Disable()
         self.text.SetToolTipString(u"手机号码")
         font.SetPointSize(fontPointSize * 2.5)
@@ -311,17 +359,32 @@ class Frame(wx.Frame):
         self.Bind(wx.EVT_TIMER, self.OnLogin)
         self.timer.Start(600, True)
 
+    def Check(self):
+        phonenumber = self.text.GetValue()
+        if ISPHONENUMBER(phonenumber):
+            if self.database.Execute("SELECT Name, Balance FROM Member WHERE PhoneNumber='{0}';".format(phonenumber)):
+                return True
+            else:
+                wx.MessageBox(u"非会员请注册", u"抱歉")
+                dlg = Frame.Member(self, u"注册", True)
+                dlg.ShowModal()
+        else:
+            wx.MessageBox(u"不是手机号码", u"警告")
+
     def OnRecharge(self, evt):
-        dlg = Frame.Recharge(self, u"充值")
-        dlg.ShowModal()
+        if self.Check():
+            dlg = Frame.Recharge(self, u"充值")
+            dlg.ShowModal()
 
     def OnPay(self, evt):
-        dlg = Frame.Pay(self, u"结账")
-        dlg.ShowModal()
+        if self.Check():
+            dlg = Frame.Pay(self, u"结账")
+            dlg.ShowModal()
 
     def OnBill(self, evt):
-        dlg = Frame.Bill(self, u"账单")
-        dlg.ShowModal()
+        if self.Check():
+            dlg = Frame.Bill(self, u"账单")
+            dlg.ShowModal()
 
     def OnLogin(self, evt=None):
         dlg = Frame.Login(self, u"登陆")
@@ -331,10 +394,6 @@ class Frame(wx.Frame):
         else:
             wx.MessageBox(u"必须登陆", u"警告")
             self.Destroy()
-
-    def OnRegister(self, evt):
-        dlg = Frame.Register(self, u"激活")
-        dlg.ShowModal()
 
 
 app = wx.App()
