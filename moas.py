@@ -5,9 +5,13 @@
 import wx
 from resource import ICON
 from db import Database
+from net import ping, NotAvailable
 import datetime
 import base64
 import re
+import wmi
+from uuid import uuid1 as UUID
+from json import dumps
 
 
 TIMESTAMP = lambda: datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -17,24 +21,58 @@ PHONENUMBER = re.compile("^1([358][0-9]|4[579]|66|7[0135678]|9[89])[0-9]{8}$")
 ISPHONENUMBER = lambda pn: PHONENUMBER.match(pn)
 EventQingDanType = wx.NewEventType()
 EventQingDanBinder = wx.PyEventBinder(EventQingDanType, 1)
+MBSN = wmi.WMI().Win32_BaseBoard()[0].SerialNumber.strip() # XXX: 无主板机器存在么
 
 
 def IMHO(db):
     if not db.Execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table';")[0][0]:
         CREATE = (
-            "CREATE TABLE Manager (Name TEXT, Password TEXT, Expired TEXT, PhoneNumber TEXT, Address TEXT, VerifyCode TEXT);",
-            "CREATE TABLE Member (PhoneNumber TEXT, Name TEXT, Balance FLOAT);",
+            "CREATE TABLE EI (SN TEXT, UUID TEXT, Time TEXT, SYNC Text);",
+            "CREATE TABLE Manager (Name TEXT, Password TEXT, Expired TEXT, PhoneNumber TEXT, Address TEXT, VerifyCode TEXT, Time TEXT);",
+            "CREATE TABLE Member (PhoneNumber TEXT, Name TEXT, Balance FLOAT, Time TEXT);",
             "CREATE TABLE Log (PhoneNumber TEXT, Name TEXT, Consume FLOAT, Balance FLOAT, Time TEXT);"
         )
         INSERT = (
-            u"INSERT INTO Manager VALUES ('nagexiucai', 'nagexiucai', '{0}', '182029*****', '中国西安', 'IGNORED');".format(DELTATIMESTAMP(DELTADAYS(30))),
-            u"INSERT INTO Member VALUES ('182029*****', '那个秀才', 888.0);",
+            u"INSERT INTO EI VALUES ('{sn}', '{uuid}', '{time}', '{time}');".format(sn=MBSN, uuid=UUID(), time=TIMESTAMP()),
+            u"INSERT INTO Manager VALUES ('nagexiucai', 'nagexiucai', '{0}', '182029*****', '中国西安', 'IGNORED', '2018-03-02 00:00:00');".format(DELTATIMESTAMP(DELTADAYS(30))),
+            u"INSERT INTO Member VALUES ('182029*****', '那个秀才', 888.0, '2018-03-02 00:00:00');",
             u"INSERT INTO Log VALUES ('182029*****', '那个秀才', 111.0, 888.0, '{0}');".format(TIMESTAMP())
         )
         for _ in CREATE:
             db.Execute(_)
         for _ in INSERT:
             db.Execute(_)
+    else:
+        # TODO: 表设计待优化（内置时间戳类型）
+        status, reason, data = ping()
+        if status == NotAvailable:
+            return
+        sn, uuid, sync = db.Execute("SELECT SN, UUID, SYNC FROM EI;")[0]
+        parameters = {}
+        parameters["sn"] = sn
+        parameters["uuid"] = uuid
+        parameters["sync"] = sync
+        manager = []
+        member = []
+        log = []
+        sync = datetime.datetime.strptime(sync, "%Y-%m-%d %H:%M:%S")
+        for name, phonenumber, address, time in db.Execute("SELECT Name, PhoneNumber, Address, Time FROM Manager;"):
+            if sync < datetime.datetime.strptime(time, "%Y-%m-%d %H:%M:%S"):
+                manager.append((name, phonenumber, address, time))
+        for phonenumber, name, time in db.Execute("SELECT PhoneNumber, Name, Time FROM Member;"):
+            if sync < datetime.datetime.strptime(time, "%Y-%m-%d %H:%M:%S"):
+                member.append((phonenumber, name, time))
+        for phonenumber, consume, time in db.Execute("SELECT PhoneNumber, Consume, Time FROM Log;"):
+            if sync < datetime.datetime.strptime(time, "%Y-%m-%d %H:%M:%S"):
+                log.append((phonenumber, consume, time))
+        parameters["manager"] = manager
+        parameters["member"] = member
+        parameters["log"] = log
+        s, r, d = ping(text=dumps(parameters))
+        if s == 200:
+            db.Execute("UPDATE EI SET SYNC='{sync}' WHERE SN='{sn}' AND UUID='{uuid}';".format(sync=TIMESTAMP(), sn=sn, uuid=uuid))
+        print s, r
+        print d
 
 
 class Frame(wx.Frame):
@@ -141,7 +179,7 @@ class Frame(wx.Frame):
                 _ = self.Parent.database.Execute(u"SELECT * FROM Manager WHERE (PhoneNumber='{account}' OR Name='{account}') AND Password='{password}';"
                                                  .format(account=account, password=password))
                 if _:
-                    name, password, expired, phonenumber, address, verifycode = _[0]
+                    name, password, expired, phonenumber, address, verifycode, time = _[0]
                     now = datetime.datetime.now()
                     expired = datetime.datetime.strptime(expired, "%Y-%m-%d %H:%M:%S")
                     if now > expired:
@@ -157,9 +195,9 @@ class Frame(wx.Frame):
                             expired = verifycode
                             password = data.get("Password")
                             name = data.get("Name")
-                            self.Parent.database.Execute(u"INSERT INTO Manager VALUES ('{name}', '{password}', '{expired}', '{phonenumber}', '{address}', '{verifycode}');"
-                                                         .format(name=name, password=password, expired=expired, phonenumber=phonenumber, address=address, verifycode=verifycode))
-                            self.Parent.database.Execute(u"DELETE FROM Manager WHERE PhoneNumber='182029*****';")
+                            self.Parent.database.Execute(u"INSERT INTO Manager VALUES ('{name}', '{password}', '{expired}', '{phonenumber}', '{address}', '{verifycode}', '{time}');"
+                                                         .format(name=name, password=password, expired=expired, phonenumber=phonenumber, address=address, verifycode=verifycode, time=TIMESTAMP()))
+                            self.Parent.database.Execute(u"DELETE FROM Manager WHERE PhoneNumber!='{0}';".format(phonenumber))
                             wx.MessageBox(u"已完成注册请新用户登陆", u"恭喜")
                             self.Parent.mark.SetLabel(u"已注册")
                         else:
@@ -229,15 +267,15 @@ class Frame(wx.Frame):
                 else:
                     if self.fresher:
                         if self.data.get("Name"):
-                            self.Parent.database.Execute(u"INSERT INTO Member VALUES ('{phonenumber}', '{name}', {balance});"
-                                                         .format(phonenumber=self.phonenumber, name=self.data.get("Name"), balance=money))
+                            self.Parent.database.Execute(u"INSERT INTO Member VALUES ('{phonenumber}', '{name}', {balance}, '{time}');"
+                                                         .format(phonenumber=self.phonenumber, name=self.data.get("Name"), balance=money, time=TIMESTAMP()))
                             self.Destroy()
                         else:
                             wx.MessageBox(u"请填写会员姓名", u"警告")
                     else:
                         balance = self.data.get("BalanceReserved") + money
-                        self.Parent.database.Execute("UPDATE Member SET Balance={balance} WHERE PhoneNumber='{phonenumber}';"
-                                                     .format(balance=balance, phonenumber=self.phonenumber))
+                        self.Parent.database.Execute("UPDATE Member SET Balance={balance}, Time='{time}' WHERE PhoneNumber='{phonenumber}';"
+                                                     .format(balance=balance, time=TIMESTAMP(), phonenumber=self.phonenumber))
                         self.Destroy()
             elif _ == Frame.Recharge.IdCancel:
                 self.Destroy()
@@ -287,8 +325,8 @@ class Frame(wx.Frame):
                         wx.MessageBox(u"余额不足请充值", u"警告")
                     else:
                         balance = self.balance - consume
-                        self.Parent.database.Execute("UPDATE Member SET Balance={balance} WHERE PhoneNumber='{phonenumber}';"
-                                                     .format(balance=balance, phonenumber=self.phonenumber))
+                        self.Parent.database.Execute("UPDATE Member SET Balance={balance}, Time='{time}' WHERE PhoneNumber='{phonenumber}';"
+                                                     .format(balance=balance, time=TIMESTAMP(), phonenumber=self.phonenumber))
                         self.Parent.database.Execute(u"INSERT INTO Log VALUES ('{phonenumber}', '{name}', {consume}, {balance}, '{time}');"
                                                  .format(phonenumber=self.phonenumber, name=self.name, consume=consume, balance=balance, time=TIMESTAMP()))
                         self.Destroy()
