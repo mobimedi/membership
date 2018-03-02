@@ -71,8 +71,6 @@ def IMHO(db):
         s, r, d = ping(text=dumps(parameters))
         if s == 200:
             db.Execute("UPDATE EI SET SYNC='{sync}' WHERE SN='{sn}' AND UUID='{uuid}';".format(sync=TIMESTAMP(), sn=sn, uuid=uuid))
-        print s, r
-        print d
 
 
 class Frame(wx.Frame):
@@ -202,6 +200,7 @@ class Frame(wx.Frame):
                             self.Parent.mark.SetLabel(u"已注册")
                         else:
                             wx.MessageBox(u"未完成注册", u"警告")
+                        self.status = None
                     else:
                         self.Destroy()
                 else:
@@ -461,6 +460,11 @@ class Frame(wx.Frame):
         dlg = Frame.Login(self, u"登陆")
         dlg.ShowModal()
         if dlg.status == Frame.Login.IdOK:
+            if self.mark.GetLabel() == u"已注册":
+                mbsn = self.database.Execute("SELECT SN FROM EI;")[0][0]
+                if MBSN != mbsn:
+                    wx.MessageBox(u"未在本设备上注册", u"警告")
+                    self.Destroy()
             self.text.Enable()
         else:
             wx.MessageBox(u"必须登陆", u"警告")
